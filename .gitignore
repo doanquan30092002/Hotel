@@ -1,0 +1,53 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Claude local secrets — DO NOT COMMIT
+.claude/settings.local.json
+.claude/state/
+!.claude/state/.gitkeep
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma generated client
+apps/api/prisma/generated/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Vercel / Railway local
+.vercel/
+.railway/
+
+# uploaded files (dev local storage)
+apps/api/uploads/

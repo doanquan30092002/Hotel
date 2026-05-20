@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+build
+coverage
+playwright-report
+test-results
+*.lock
+*.log
+TemplateImage/
+apps/api/prisma/migrations/

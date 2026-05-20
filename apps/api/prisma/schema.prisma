@@ -1,0 +1,71 @@
+// Prisma schema for Hotel Management API.
+// Full entity set lives in PLAN.md (Section 2). Phase 1 ships User + Setting + AuditLog;
+// later phases add Room, Customer, Booking, BookingItem, Payment, Service, PricePackage,
+// HousekeepingTask, FinanceTx, Staff, Payroll, Upload, Category.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  RECEPTIONIST
+  HOUSEKEEPING
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  fullName     String
+  role         UserRole   @default(RECEPTIONIST)
+  status       UserStatus @default(ACTIVE)
+  avatarUrl    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  auditLogs AuditLog[]
+
+  @@index([role, status])
+}
+
+// Single-row table for property settings. Enforced by checking `id = "singleton"` at the service layer.
+model Setting {
+  id              String   @id @default("singleton")
+  propertyName    String
+  taxCode         String?
+  address         String?
+  email           String?
+  website         String?
+  hotline         String?
+  themeTone       Int      @default(2) // 1 Pink Boutique | 2 Boutique Vibe | 3 Olive Organic
+  monthlyRevenueTarget Decimal? @db.Decimal(15, 2)
+  note            String?
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // create | update | delete
+  entity    String   // e.g. booking, room
+  entityId  String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
+}

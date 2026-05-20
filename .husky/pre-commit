@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Hotel Management — pre-commit hook
+# Runs lint + typecheck for staged code. Auto-deploy hook relies on this gate.
+
+set -e
+
+echo "[pre-commit] lint + typecheck"
+pnpm -r lint
+pnpm -r typecheck
+
+# lint-staged for prettier on staged files (gracefully skip if not installed yet)
+if [ -x "$(command -v pnpm)" ]; then
+  pnpm exec lint-staged --concurrent false || true
+fi

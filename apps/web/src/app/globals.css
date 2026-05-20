@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- Tone 2: Boutique Vibe (default) --- */
+:root,
+:root[data-tone="2"] {
+  --background: 0 0% 100%;
+  --foreground: 240 10% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 4%;
+  --primary: 271 76% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --accent: 295 65% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 90%;
+  --input: 240 6% 90%;
+  --ring: 271 76% 53%;
+  --radius: 0.75rem;
+}
+
+/* --- Tone 1: Pink Boutique --- */
+:root[data-tone="1"] {
+  --primary: 322 70% 56%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 340 80% 70%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 322 70% 56%;
+}
+
+/* --- Tone 3: Olive Organic --- */
+:root[data-tone="3"] {
+  --primary: 95 40% 40%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 120 30% 55%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 95 40% 40%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
