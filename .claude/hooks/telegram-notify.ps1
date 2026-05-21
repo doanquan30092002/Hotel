@@ -87,16 +87,27 @@ if ($payload) {
   $toolName = $payload.tool_name
 }
 
-# ---------- Detect subagent name from transcript ----------
-# Match agent definitions in .claude/agents/*.md (name field in frontmatter, or "You are the **<name>**" body).
+# ---------- Detect subagent name ----------
+# Primary source: sibling .meta.json file (Claude Code writes {"agentType":"..."} there).
+# Fallback: regex over first 200 lines of the transcript (works for explicit subagent_type
+# tool_use blocks in the parent session's transcript).
 function Get-SubagentName([string]$path) {
-  if (-not $path -or -not (Test-Path $path)) { return $null }
+  if (-not $path) { return $null }
+  if ($path -match '\.jsonl$') {
+    $metaPath = $path -replace '\.jsonl$', '.meta.json'
+    if (Test-Path $metaPath) {
+      try {
+        $meta = Get-Content $metaPath -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($meta.agentType) { return [string]$meta.agentType }
+      } catch { Write-Log "Get-SubagentName meta parse failed: $_" }
+    }
+  }
+  if (-not (Test-Path $path)) { return $null }
   try {
     $head = Get-Content $path -TotalCount 200 -Encoding utf8 -ErrorAction Stop
     foreach ($line in $head) {
       if ($line -match '"subagent_type"\s*:\s*"([\w-]+)"') { return $Matches[1] }
-      if ($line -match 'You are the \*\*([\w-]+)\*\*') { return $Matches[1] }
-      if ($line -match 'name:\s*([\w-]+)\s*\\n') { return $Matches[1] }
+      if ($line -match '"agentType"\s*:\s*"([\w-]+)"') { return $Matches[1] }
     }
   } catch { Write-Log "Get-SubagentName failed: $_" }
   return $null
