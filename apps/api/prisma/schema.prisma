@@ -56,6 +56,39 @@ model Setting {
   updatedAt       DateTime @updatedAt
 }
 
+enum CategoryGroup {
+  ROOM_TYPE
+  ROOM_AREA
+  ROOM_STATUS
+  CLEANING_STATUS
+  PRICE_TYPE
+  PAYMENT_METHOD
+  BOOKING_SOURCE
+  BOOKING_STATUS
+  HOUSEKEEPING_TASK_STATUS
+  FINANCE_GROUP
+  GUEST_SOURCE
+  UNIT
+  SERVICE_GROUP
+  SURCHARGE_TYPE
+}
+
+model Category {
+  id        String        @id @default(cuid())
+  group     CategoryGroup
+  code      String
+  name      String
+  sortOrder Int           @default(0)
+  active    Boolean       @default(true)
+  meta      Json?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+
+  @@unique([group, code])
+  @@index([group, active, sortOrder])
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?

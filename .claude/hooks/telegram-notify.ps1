@@ -87,6 +87,59 @@ if ($payload) {
   $toolName = $payload.tool_name
 }
 
+# ---------- Detect subagent name from transcript ----------
+# Match agent definitions in .claude/agents/*.md (name field in frontmatter, or "You are the **<name>**" body).
+function Get-SubagentName([string]$path) {
+  if (-not $path -or -not (Test-Path $path)) { return $null }
+  try {
+    $head = Get-Content $path -TotalCount 200 -Encoding utf8 -ErrorAction Stop
+    foreach ($line in $head) {
+      if ($line -match '"subagent_type"\s*:\s*"([\w-]+)"') { return $Matches[1] }
+      if ($line -match 'You are the \*\*([\w-]+)\*\*') { return $Matches[1] }
+      if ($line -match 'name:\s*([\w-]+)\s*\\n') { return $Matches[1] }
+    }
+  } catch { Write-Log "Get-SubagentName failed: $_" }
+  return $null
+}
+
+# ---------- Extract last assistant text summary from transcript ----------
+# Walks transcript JSONL backwards, finds the most recent assistant text content,
+# returns first $maxLines non-blank lines (truncated to $maxChars total).
+function Get-LastAssistantSummary([string]$path, [int]$maxLines = 12, [int]$maxChars = 900) {
+  if (-not $path -or -not (Test-Path $path)) { return $null }
+  try {
+    $lines = Get-Content $path -Tail 300 -Encoding utf8 -ErrorAction Stop
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+      $raw = $lines[$i]
+      if (-not $raw -or -not $raw.Trim()) { continue }
+      try {
+        $evt = $raw | ConvertFrom-Json -ErrorAction Stop
+      } catch { continue }
+      if ($evt.type -ne 'assistant') { continue }
+      if (-not $evt.message) { continue }
+      $content = $evt.message.content
+      if (-not $content) { continue }
+      $texts = @()
+      foreach ($block in $content) {
+        if ($block.type -eq 'text' -and $block.text) { $texts += $block.text }
+      }
+      if ($texts.Count -eq 0) { continue }
+      $combined = ($texts -join "`n").Trim()
+      $allLines = $combined -split "`r?`n"
+      $nonBlank = @()
+      foreach ($l in $allLines) {
+        $t = $l.TrimEnd()
+        if ($t.Trim()) { $nonBlank += $t }
+        if ($nonBlank.Count -ge $maxLines) { break }
+      }
+      $summary = $nonBlank -join "`n"
+      if ($summary.Length -gt $maxChars) { $summary = $summary.Substring(0, $maxChars) + '...' }
+      return $summary
+    }
+  } catch { Write-Log "Get-LastAssistantSummary failed: $_" }
+  return $null
+}
+
 # ---------- Read PROGRESS.md to find current phase ----------
 $phase = 'unknown'
 $progressPath = Join-Path $ProjectRoot 'PROGRESS.md'
@@ -137,6 +190,14 @@ $header = switch ($Event) {
 
 $body = @()
 $body += $header
+
+# Subagent name (only for SubagentStop)
+$subagentName = $null
+if ($Event -eq 'SubagentStop') {
+  $subagentName = Get-SubagentName $transcriptPath
+  if ($subagentName) { $body += "Subagent: $subagentName" }
+}
+
 $body += "Phase: $phase"
 $body += "Session: $sessionId"
 if ($toolName) { $body += "Tool: $toolName" }
@@ -150,8 +211,26 @@ if ($testResult) {
   if ($testResult.reason) { $reason = ' - ' + $testResult.reason }
   $body += "Test: $($testResult.status)$reason"
 }
+
+# Summary of what was just completed (for Stop / SubagentStop)
+if ($Event -in @('Stop', 'SubagentStop')) {
+  $summary = Get-LastAssistantSummary $transcriptPath
+  if ($summary) {
+    $body += ''
+    $body += 'Summary:'
+    foreach ($l in ($summary -split "`r?`n")) {
+      if ($l.Trim()) { $body += "  $l" }
+    }
+  }
+}
+
 $body += "Time: $timestamp"
 $message = $body -join "`n"
+
+# Telegram hard limit is 4096 chars; truncate body if huge.
+if ($message.Length -gt 3900) {
+  $message = $message.Substring(0, 3900) + "`n... (truncated)"
+}
 
 # ---------- Send to Telegram ----------
 try {

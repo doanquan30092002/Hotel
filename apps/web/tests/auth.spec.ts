@@ -18,7 +18,7 @@ test.describe('Authentication flow', () => {
   test('login page shows email and password fields', async ({ page }) => {
     await page.goto('/dang-nhap');
     await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Mật khẩu')).toBeVisible();
+    await expect(page.getByLabel('Mật khẩu').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Đăng nhập' })).toBeVisible();
   });
 

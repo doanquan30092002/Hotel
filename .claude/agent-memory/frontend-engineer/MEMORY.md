@@ -92,6 +92,49 @@ CSS variables trong `globals.css`:
 - `<StatusBadge value />` — map status enum → badge class.
 - `<ChartAreaTrend />`, `<ChartDonutStatus />`, `<ChartGauge />`, `<ChartHeatmapOccupancy />`, `<ChartBar />` — Recharts wrappers.
 
+## Phase 2 UI primitives (in `components/ui/`)
+
+- `dialog.tsx` — wraps `@radix-ui/react-dialog`. DialogContent uses `z-50`, `rounded-xl`, `shadow-xl`, max-w-md. Close button (X icon) built-in with `aria-label="Đóng"`.
+- `select.tsx` — wraps `@radix-ui/react-select`. SelectTrigger h-10 matches Input. Uses `popper` position for dropdown.
+- `switch.tsx` — wraps `@radix-ui/react-switch`. h-5 w-9, primary when checked, input color when unchecked.
+- `badge.tsx` — CVA variants: default/emerald/sky/amber/orange/rose/zinc/outline. Pill-shaped via `rounded-full`.
+- `skeleton.tsx` — `animate-pulse rounded-md bg-muted`, `aria-hidden="true"`.
+
+## GroupCount KPI pattern (Phase 2)
+
+- `useGroupCounts()` returns `GroupCount[]`. KPI row derives 4 values: `sum(total)`, `length`, `sum(active)`, `total-active`.
+- KPI card component: icon + label + animated Skeleton (while loading) or value (bold 2xl).
+- GroupCount staleTime 30s same as list.
+
+## Chip-filter pattern (Phase 2)
+
+- Horizontal `flex flex-wrap gap-2` of `<button>` tags inside a Card.
+- Active chip: `bg-primary text-primary-foreground`, inactive: `border border-border text-muted-foreground`.
+- Each chip shows `<label> (<active count>)` from groupCounts data.
+- Chip state is synced with the Select dropdown above via shared `activeGroup` state.
+- `aria-pressed` on each chip for accessibility.
+
+## RBAC-gated actions pattern (Phase 2)
+
+- `const canEdit = hasRole('ADMIN', 'MANAGER')` from `useAuth()`.
+- Edit/Delete buttons, Add button, and Switch toggle all wrapped in `{canEdit && ...}`.
+- When `canEdit` is false, actions column renders nothing; read-only view for RECEPTIONIST/HOUSEKEEPING.
+- Dialog form: Select for group is `disabled={isEditing}` (group immutable per API contract).
+
+## Debounce hook
+
+- `lib/hooks/use-debounced-value.ts` — generic `useDebouncedValue<T>(value, delay=300)` using `useEffect + setTimeout`. Resets page to 1 whenever keyword changes.
+
+## Category hooks pattern
+
+- `CATEGORY_KEYS` const for consistent query keys: `['categories']` as base, `['categories','list',params]`, `['categories','group-counts']`.
+- All mutations invalidate `CATEGORY_KEYS.all` (which invalidates both list and group-counts).
+- `useToggleActive()` calls `PATCH /categories/:id/toggle-active`.
+
+## Playwright gotcha
+
+- Login page has both `<input aria-label="Mật khẩu">` and a toggle button with `aria-label="Hiện mật khẩu"`. `getByLabel('Mật khẩu')` matches 2 elements → use `.first()` to avoid strict mode violation.
+
 ## Gotchas
 
 - `noUncheckedIndexedAccess`: array index access returns `T | undefined` — always guard.

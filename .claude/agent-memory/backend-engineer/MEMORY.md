@@ -28,7 +28,55 @@ export class BookingsController {
 
 ## Gotchas
 
-- _(trống — cập nhật khi gặp)_
+- Prisma `Json?` nullable field: use `Prisma.JsonNull` instead of `null` literal when creating records (type mismatch otherwise). Cast custom object as `Prisma.InputJsonValue`.
+- `prisma generate` may throw `EPERM` on Windows when the DLL is locked by a running process — migration still applies; types are already generated.
+- `jest --testPathPattern` does not work when `rootDir` in jest config is a subdirectory (e.g. `test/`). Run `npx jest --config ./test/jest-e2e.json <pattern>` directly from `apps/api` instead.
+
+## Patterns added in Phase 2
+
+### GroupBy / group counts (two-query pattern)
+
+```ts
+const [totalCounts, activeCounts] = await Promise.all([
+  prisma.category.groupBy({ by: ['group'], where: { deletedAt: null }, _count: { _all: true } }),
+  prisma.category.groupBy({
+    by: ['group'],
+    where: { deletedAt: null, active: true },
+    _count: { _all: true },
+  }),
+]);
+const activeMap = new Map(activeCounts.map((r) => [r.group, r._count._all]));
+// Fill all enum values with 0 for groups with no rows
+const data = Object.values(CategoryGroup).map((group) => ({
+  group,
+  total: totalMap.get(group) ?? 0,
+  active: activeMap.get(group) ?? 0,
+}));
+```
+
+### Reorder transaction pattern
+
+```ts
+await prisma.$transaction(async (tx) => {
+  const rows = await tx.category.findMany({
+    where: { group, deletedAt: null },
+    select: { id: true },
+  });
+  const validIds = new Set(rows.map((r) => r.id));
+  const updates = orderedIds
+    .filter((id) => validIds.has(id))
+    .map((id, index) => tx.category.update({ where: { id }, data: { sortOrder: index } }));
+  await Promise.all(updates);
+  affected = updates.length;
+});
+```
+
+### Soft-delete for lookup/category tables
+
+- Same `deletedAt` pattern as business entities.
+- `list()` and `findOne()` both filter `deletedAt: null`.
+- Seed uses `upsert` keyed on composite unique `(group, code)` — idempotent re-run safe.
+- `group` field is immutable after creation (422 if attempted via service guard).
 
 ## Decisions
 

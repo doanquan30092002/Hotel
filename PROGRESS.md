@@ -3,8 +3,8 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-21
-**Current phase**: Phase 1 — Auth + Users + Settings + Theme ✓ (review + test PASS)
-**Active branch**: `feat/01-auth-users-settings`
+**Current phase**: Phase 2 — Categories (Danh mục) ✓ (review + test gate PASS — 52/52 e2e + 6/6 Playwright)
+**Active branch**: `feat/02-categories`
 
 ## Phase status
 
@@ -26,7 +26,14 @@
   - [x] pnpm api:lint / api:typecheck / web:lint / web:typecheck (0 warnings/errors)
   - [x] tester gate: 30/30 e2e PASS fresh (health + auth + users + settings)
   - [x] code-reviewer gate: PASS (3 critical + 4 nit issues đã fix trong session này)
-- [ ] 2. Categories (Danh mục)
+- [x] **2. Categories (Danh mục)**
+  - [x] BE: `Category` model + enum `CategoryGroup` (14 values) + migration `02_categories` + seed 63 default rows
+  - [x] BE: 8 endpoint `/api/v1/categories` — list/group-counts/get/create/patch/toggle-active/reorder/delete
+  - [x] BE: Soft-delete resurrection trong `create()` (xử lý non-partial unique `(group, code)`) + try/catch P2002 defensive
+  - [x] FE: 5 primitive mới (dialog, select, switch, badge, skeleton)
+  - [x] FE: `/danh-muc` — KPI 4 cards + search debounce + group select + chip row + table + dialog CRUD + delete confirm + RBAC gating
+  - [x] Tester gate: 52/52 e2e PASS (5 suites) + 6/6 Playwright PASS
+  - [x] Code-reviewer gate: PASS (chỉ 4 nit non-blocking)
 - [ ] 3. Rooms (Phòng)
 - [ ] 4. Customers (Khách hàng)
 - [ ] 5. Services + Price Packages
@@ -43,7 +50,7 @@
 
 ## Currently working on
 
-- **Status**: Phase 1 hoàn tất. Cả review + test gate đều PASS. Branch `feat/01-auth-users-settings` sẵn sàng push + mở PR vào `main`.
+- **Status**: Phase 2 FE hoàn tất. typecheck + lint 0 errors. 6/6 Playwright PASS. Chờ code-reviewer + tester gate (integration with BE API).
 - **Completed this session (FE)**:
   - UI primitives: button (CVA variants), input, label, card, use-toast/toast/toaster, dropdown-menu, avatar.
   - Auth: zustand persist store (`hotel.auth`), `use-auth` hook (`isAuthenticated`, `hasRole`).
@@ -66,10 +73,23 @@
   - Global guards + interceptor registered in `AppModule` via `APP_GUARD` / `APP_INTERCEPTOR`.
 
 - **Next actions (Phase 2 — Categories / Danh mục)**:
-  - `backend-engineer`: model `Category(id, group enum, code, name, sortOrder, active)` + CRUD theo group (`roomType | roomArea | roomStatus | cleaningStatus | priceType | paymentMethod | bookingSource | bookingStatus | housekeepingTaskStatus | financeGroup | guestSource`).
-  - `frontend-engineer`: trang `/danh-muc` (ảnh `7_16_07`) — list grouped, modal CRUD, drag-sort, toggle active.
-  - Seed: chèn default values cho mỗi group khi seed.
-  - `tester` + `code-reviewer`: gate cuối phase 2.
+  - [x] `backend-engineer`: model + migration + CRUD + seed (done).
+  - [x] `frontend-engineer`: trang `/danh-muc` (ảnh `7_16_07`) — KPI, group chips, table with CRUD/toggle, form dialog, delete dialog.
+  - [ ] `tester` + `code-reviewer`: gate cuối phase 2 (integration test with live BE).
+
+- **Phase 2 FE files created**:
+  - `apps/web/src/types/category.ts` — CategoryGroup, Category, GroupCount, CATEGORY_GROUP_LABEL
+  - `apps/web/src/lib/hooks/use-debounced-value.ts`
+  - `apps/web/src/lib/hooks/use-categories.ts` — useCategories, useGroupCounts, useCreateCategory, useUpdateCategory, useDeleteCategory, useToggleActive
+  - `apps/web/src/components/ui/dialog.tsx` — Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose
+  - `apps/web/src/components/ui/select.tsx` — Select, SelectTrigger, SelectValue, SelectContent, SelectItem
+  - `apps/web/src/components/ui/switch.tsx` — Switch (radix-based)
+  - `apps/web/src/components/ui/badge.tsx` — Badge (CVA variants: emerald/sky/amber/orange/rose/zinc/outline)
+  - `apps/web/src/components/ui/skeleton.tsx` — Skeleton (animate-pulse)
+  - `apps/web/src/app/(dashboard)/danh-muc/page.tsx` — full implementation replacing ComingSoon
+  - `apps/web/tests/danh-muc.spec.ts` — Playwright offline-friendly tests
+  - Fixed: `apps/web/src/components/layout/Sidebar.tsx` — href type cast for Next.js strict route typing
+  - Fixed: `apps/web/tests/auth.spec.ts` — getByLabel('Mật khẩu').first() to avoid strict mode violation
 
 - **Pre-requisites for running**:
   1. `docker compose up -d` (Postgres).

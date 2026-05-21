@@ -1,7 +1,228 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+
+for (const candidate of [resolve(__dirname, '../../../.env'), resolve(__dirname, '../.env')]) {
+  if (existsSync(candidate)) {
+    loadEnv({ path: candidate });
+    break;
+  }
+}
+
+import { CategoryGroup, Prisma, PrismaClient, UserRole } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
+
+interface CategorySeed {
+  group: CategoryGroup;
+  code: string;
+  name: string;
+  sortOrder: number;
+  meta?: Record<string, unknown>;
+}
+
+const CATEGORY_SEEDS: CategorySeed[] = [
+  // ROOM_TYPE
+  { group: CategoryGroup.ROOM_TYPE, code: 'single', name: 'Phòng đơn', sortOrder: 0 },
+  { group: CategoryGroup.ROOM_TYPE, code: 'double', name: 'Phòng đôi', sortOrder: 1 },
+  { group: CategoryGroup.ROOM_TYPE, code: 'vip', name: 'Phòng VIP', sortOrder: 2 },
+  { group: CategoryGroup.ROOM_TYPE, code: 'family', name: 'Phòng gia đình', sortOrder: 3 },
+  { group: CategoryGroup.ROOM_TYPE, code: 'dorm', name: 'Phòng tập thể', sortOrder: 4 },
+
+  // ROOM_AREA
+  { group: CategoryGroup.ROOM_AREA, code: 'f1', name: 'Tầng 1', sortOrder: 0 },
+  { group: CategoryGroup.ROOM_AREA, code: 'f2', name: 'Tầng 2', sortOrder: 1 },
+  { group: CategoryGroup.ROOM_AREA, code: 'f3', name: 'Tầng 3', sortOrder: 2 },
+  { group: CategoryGroup.ROOM_AREA, code: 'bungalow', name: 'Bungalow', sortOrder: 3 },
+
+  // ROOM_STATUS
+  {
+    group: CategoryGroup.ROOM_STATUS,
+    code: 'ready',
+    name: 'Sẵn sàng',
+    sortOrder: 0,
+    meta: { color: '#10b981' },
+  },
+  {
+    group: CategoryGroup.ROOM_STATUS,
+    code: 'occupied',
+    name: 'Đang ở',
+    sortOrder: 1,
+    meta: { color: '#0ea5e9' },
+  },
+  {
+    group: CategoryGroup.ROOM_STATUS,
+    code: 'maintenance',
+    name: 'Bảo trì',
+    sortOrder: 2,
+    meta: { color: '#f97316' },
+  },
+  {
+    group: CategoryGroup.ROOM_STATUS,
+    code: 'cleaning',
+    name: 'Dọn dẹp',
+    sortOrder: 3,
+    meta: { color: '#f59e0b' },
+  },
+  {
+    group: CategoryGroup.ROOM_STATUS,
+    code: 'disabled',
+    name: 'Ngưng',
+    sortOrder: 4,
+    meta: { color: '#f43f5e' },
+  },
+
+  // CLEANING_STATUS
+  { group: CategoryGroup.CLEANING_STATUS, code: 'clean', name: 'Sạch', sortOrder: 0 },
+  { group: CategoryGroup.CLEANING_STATUS, code: 'cleaning', name: 'Đang dọn', sortOrder: 1 },
+  { group: CategoryGroup.CLEANING_STATUS, code: 'dirty', name: 'Cần dọn', sortOrder: 2 },
+
+  // PRICE_TYPE
+  { group: CategoryGroup.PRICE_TYPE, code: 'per_night', name: 'Giá theo đêm', sortOrder: 0 },
+  { group: CategoryGroup.PRICE_TYPE, code: 'per_hour', name: 'Giá theo giờ', sortOrder: 1 },
+  { group: CategoryGroup.PRICE_TYPE, code: 'per_week', name: 'Giá theo tuần', sortOrder: 2 },
+  { group: CategoryGroup.PRICE_TYPE, code: 'per_month', name: 'Giá theo tháng', sortOrder: 3 },
+
+  // PAYMENT_METHOD
+  { group: CategoryGroup.PAYMENT_METHOD, code: 'cash', name: 'Tiền mặt', sortOrder: 0 },
+  {
+    group: CategoryGroup.PAYMENT_METHOD,
+    code: 'bank_transfer',
+    name: 'Chuyển khoản',
+    sortOrder: 1,
+  },
+  { group: CategoryGroup.PAYMENT_METHOD, code: 'card', name: 'Thẻ', sortOrder: 2 },
+  { group: CategoryGroup.PAYMENT_METHOD, code: 'e_wallet', name: 'Ví điện tử', sortOrder: 3 },
+
+  // BOOKING_SOURCE
+  { group: CategoryGroup.BOOKING_SOURCE, code: 'walkin', name: 'Trực tiếp', sortOrder: 0 },
+  { group: CategoryGroup.BOOKING_SOURCE, code: 'hotline', name: 'Hotline', sortOrder: 1 },
+  { group: CategoryGroup.BOOKING_SOURCE, code: 'website', name: 'Website', sortOrder: 2 },
+  { group: CategoryGroup.BOOKING_SOURCE, code: 'bookingdotcom', name: 'Booking.com', sortOrder: 3 },
+  { group: CategoryGroup.BOOKING_SOURCE, code: 'agoda', name: 'Agoda', sortOrder: 4 },
+  { group: CategoryGroup.BOOKING_SOURCE, code: 'other', name: 'Khác', sortOrder: 5 },
+
+  // BOOKING_STATUS
+  {
+    group: CategoryGroup.BOOKING_STATUS,
+    code: 'pending',
+    name: 'Chờ xác nhận',
+    sortOrder: 0,
+    meta: { color: '#f59e0b' },
+  },
+  {
+    group: CategoryGroup.BOOKING_STATUS,
+    code: 'confirmed',
+    name: 'Đã xác nhận',
+    sortOrder: 1,
+    meta: { color: '#0ea5e9' },
+  },
+  {
+    group: CategoryGroup.BOOKING_STATUS,
+    code: 'checked_in',
+    name: 'Đang ở',
+    sortOrder: 2,
+    meta: { color: '#10b981' },
+  },
+  {
+    group: CategoryGroup.BOOKING_STATUS,
+    code: 'checked_out',
+    name: 'Đã trả phòng',
+    sortOrder: 3,
+    meta: { color: '#71717a' },
+  },
+  {
+    group: CategoryGroup.BOOKING_STATUS,
+    code: 'cancelled',
+    name: 'Đã huỷ',
+    sortOrder: 4,
+    meta: { color: '#f43f5e' },
+  },
+
+  // HOUSEKEEPING_TASK_STATUS
+  { group: CategoryGroup.HOUSEKEEPING_TASK_STATUS, code: 'waiting', name: 'Chờ', sortOrder: 0 },
+  {
+    group: CategoryGroup.HOUSEKEEPING_TASK_STATUS,
+    code: 'in_progress',
+    name: 'Đang làm',
+    sortOrder: 1,
+  },
+  { group: CategoryGroup.HOUSEKEEPING_TASK_STATUS, code: 'done', name: 'Xong', sortOrder: 2 },
+  { group: CategoryGroup.HOUSEKEEPING_TASK_STATUS, code: 'skipped', name: 'Bỏ qua', sortOrder: 3 },
+
+  // FINANCE_GROUP
+  {
+    group: CategoryGroup.FINANCE_GROUP,
+    code: 'room_revenue',
+    name: 'Doanh thu phòng',
+    sortOrder: 0,
+  },
+  {
+    group: CategoryGroup.FINANCE_GROUP,
+    code: 'service_revenue',
+    name: 'Doanh thu dịch vụ',
+    sortOrder: 1,
+  },
+  {
+    group: CategoryGroup.FINANCE_GROUP,
+    code: 'payroll_expense',
+    name: 'Chi tiền lương',
+    sortOrder: 2,
+  },
+  { group: CategoryGroup.FINANCE_GROUP, code: 'utilities', name: 'Chi điện nước', sortOrder: 3 },
+  { group: CategoryGroup.FINANCE_GROUP, code: 'supplies', name: 'Chi mua sắm', sortOrder: 4 },
+  { group: CategoryGroup.FINANCE_GROUP, code: 'other_expense', name: 'Chi khác', sortOrder: 5 },
+
+  // GUEST_SOURCE
+  { group: CategoryGroup.GUEST_SOURCE, code: 'individual', name: 'Khách lẻ', sortOrder: 0 },
+  { group: CategoryGroup.GUEST_SOURCE, code: 'group', name: 'Khách đoàn', sortOrder: 1 },
+  { group: CategoryGroup.GUEST_SOURCE, code: 'corporate', name: 'Khách công ty', sortOrder: 2 },
+
+  // UNIT
+  { group: CategoryGroup.UNIT, code: 'room', name: 'Phòng', sortOrder: 0 },
+  { group: CategoryGroup.UNIT, code: 'night', name: 'Đêm', sortOrder: 1 },
+  { group: CategoryGroup.UNIT, code: 'person', name: 'Người', sortOrder: 2 },
+  { group: CategoryGroup.UNIT, code: 'session', name: 'Lượt', sortOrder: 3 },
+  { group: CategoryGroup.UNIT, code: 'hour', name: 'Giờ', sortOrder: 4 },
+
+  // SERVICE_GROUP
+  { group: CategoryGroup.SERVICE_GROUP, code: 'food', name: 'Ăn uống', sortOrder: 0 },
+  { group: CategoryGroup.SERVICE_GROUP, code: 'laundry', name: 'Giặt là', sortOrder: 1 },
+  { group: CategoryGroup.SERVICE_GROUP, code: 'transport', name: 'Đưa đón', sortOrder: 2 },
+  { group: CategoryGroup.SERVICE_GROUP, code: 'spa', name: 'Spa', sortOrder: 3 },
+  { group: CategoryGroup.SERVICE_GROUP, code: 'other', name: 'Khác', sortOrder: 4 },
+
+  // SURCHARGE_TYPE
+  { group: CategoryGroup.SURCHARGE_TYPE, code: 'extra_hour', name: 'Phụ thu giờ', sortOrder: 0 },
+  {
+    group: CategoryGroup.SURCHARGE_TYPE,
+    code: 'extra_person',
+    name: 'Phụ thu người',
+    sortOrder: 1,
+  },
+  { group: CategoryGroup.SURCHARGE_TYPE, code: 'weekend', name: 'Phụ thu cuối tuần', sortOrder: 2 },
+  { group: CategoryGroup.SURCHARGE_TYPE, code: 'holiday', name: 'Phụ thu lễ', sortOrder: 3 },
+];
+
+async function seedCategories(): Promise<void> {
+  for (const seed of CATEGORY_SEEDS) {
+    await prisma.category.upsert({
+      where: { group_code: { group: seed.group, code: seed.code } },
+      update: { name: seed.name, sortOrder: seed.sortOrder, active: true },
+      create: {
+        group: seed.group,
+        code: seed.code,
+        name: seed.name,
+        sortOrder: seed.sortOrder,
+        active: true,
+        meta: (seed.meta as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
+      },
+    });
+  }
+
+  console.log(`Seed categories: ${CATEGORY_SEEDS.length} rows upserted`);
+}
 
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
@@ -31,6 +252,8 @@ async function main() {
       themeTone: 2,
     },
   });
+
+  await seedCategories();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }

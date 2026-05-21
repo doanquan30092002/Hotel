@@ -8,6 +8,7 @@ import { HealthController } from './health.controller';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SettingsModule } from './settings/settings.module';
+import { CategoriesModule } from './categories/categories.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -23,6 +24,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     AuthModule,
     UsersModule,
     SettingsModule,
+    CategoriesModule,
   ],
   controllers: [HealthController],
   providers: [
