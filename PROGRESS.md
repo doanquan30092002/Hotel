@@ -3,8 +3,8 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-21
-**Current phase**: Phase 2 — Categories (Danh mục) ✓ (review + test gate PASS — 52/52 e2e + 6/6 Playwright)
-**Active branch**: `feat/02-categories`
+**Current phase**: Phase 3 — Rooms (Phòng) ✓ (review + test gate PASS — 81/81 e2e + 17/17 Playwright)
+**Active branch**: `feat/03-rooms`
 
 ## Phase status
 
@@ -34,7 +34,15 @@
   - [x] FE: `/danh-muc` — KPI 4 cards + search debounce + group select + chip row + table + dialog CRUD + delete confirm + RBAC gating
   - [x] Tester gate: 52/52 e2e PASS (5 suites) + 6/6 Playwright PASS
   - [x] Code-reviewer gate: PASS (chỉ 4 nit non-blocking)
-- [ ] 3. Rooms (Phòng)
+- [x] **3. Rooms (Phòng)**
+  - [x] BE: `Room` model + 4 named relations Category↔Room (type/area/status/cleaning) + migration `03_rooms` + seed 10 demo rooms (P101..V102)
+  - [x] BE: 7 endpoint `/api/v1/rooms` — list (filter typeId/statusId/cleaningStatusId/areaId/keyword + pagination) / get / create / patch / delete (soft) / patch status / patch cleaning
+  - [x] BE: Category-group validation cho mọi FK (typeId phải group=ROOM_TYPE,...), Decimal accept number|string, soft-delete resurrection on duplicate code, RBAC: status-flip mở rộng cho RECEPTIONIST, cleaning-flip cho HOUSEKEEPING
+  - [x] FE: 1 primitive mới (textarea) + `formatVnd()` helper + `ROOM_KEYS` query-key constants
+  - [x] FE: `/phong` — toolbar (search + Bảng/Lưới toggle + 3 filter selects + add btn) + Bảng view (12 cột match `7_15_29`) + Lưới view (4-col cards match `7_15_34`) + dialog create/edit/detail + delete confirm + inline status/cleaning dropdown trên badge (RBAC-aware) + loading/empty/error states
+  - [x] FE: Fix Zustand-persist hydration race trong `(dashboard)/layout.tsx` (hydrated flag + 2-stage useEffect)
+  - [x] Tester gate: 81/81 e2e PASS (6 suites: health/auth/users/settings/categories/rooms — 29 mới) + 17/17 Playwright PASS (11 mới)
+  - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 6 nit non-blocking — gồm gợi ý gộp 4 reference-category queries, totalCapacity per-page vs all-pages)
 - [ ] 4. Customers (Khách hàng)
 - [ ] 5. Services + Price Packages
 - [ ] 6. Bookings (CORE)
@@ -50,7 +58,30 @@
 
 ## Currently working on
 
-- **Status**: Phase 2 FE hoàn tất. typecheck + lint 0 errors. 6/6 Playwright PASS. Chờ code-reviewer + tester gate (integration with BE API).
+- **Status**: Phase 3 (Rooms) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 4 (Customers / Khách hàng).
+- **Phase 3 result**: BE 81/81 e2e PASS (6 suites), FE 17/17 Playwright PASS, lint+typecheck clean cả BE và FE. Code-review PASS với 0 Critical / 0 Major / 6 nit.
+- **Next phase prep (Phase 4 — Customers)**: `Customer` model (id, code, fullName, phone unique, idNumber unique, email, address, nationality, sourceId→GUEST_SOURCE, note, docs[]). CRUD + unique constraints + soft-delete. Trang `/khach-hang` list+form. Upload giấy tờ sẽ hoãn sang Phase 12.
+
+### Phase 3 — files (BE)
+
+- `apps/api/src/rooms/rooms.module.ts` / `.service.ts` / `.controller.ts`
+- `apps/api/src/rooms/dto/create-room.dto.ts` / `update-room.dto.ts` / `query-room.dto.ts` / `change-status.dto.ts` / `change-cleaning.dto.ts`
+- `apps/api/src/rooms/entities/room.entity.ts` — `RoomEntity.from()` strips `deletedAt`, Decimal→string, nests `{type, area, status, cleaningStatus}` với `{id, code, name}` only
+- `apps/api/prisma/schema.prisma` — Room model + 4 named relations `RoomType` / `RoomArea` / `RoomStatus` / `RoomCleaningStatus`, FK `onDelete RESTRICT` cho type/status/cleaning, `SET NULL` cho area
+- `apps/api/prisma/migrations/20260521161414_03_rooms/migration.sql`
+- `apps/api/prisma/seed.ts` — `getCategoryIdByGroupCode()` helper + `ROOM_SEEDS` (10 rooms) + `seedRooms()`
+- `apps/api/src/app.module.ts` — registered RoomsModule
+- `apps/api/test/rooms.e2e-spec.ts` — 29 tests
+
+### Phase 3 — files (FE)
+
+- `apps/web/src/types/room.ts`
+- `apps/web/src/lib/hooks/use-rooms.ts` — `ROOM_KEYS` + 7 hooks
+- `apps/web/src/lib/format.ts` — `formatVnd(n)`
+- `apps/web/src/components/ui/textarea.tsx`
+- `apps/web/src/app/(dashboard)/phong/page.tsx` — full implementation (replaced ComingSoon)
+- `apps/web/src/app/(dashboard)/layout.tsx` — hydration guard
+- `apps/web/tests/phong.spec.ts` — 11 offline Playwright tests
 - **Completed this session (FE)**:
   - UI primitives: button (CVA variants), input, label, card, use-toast/toast/toaster, dropdown-menu, avatar.
   - Auth: zustand persist store (`hotel.auth`), `use-auth` hook (`isAuthenticated`, `hasRole`).
@@ -211,6 +242,13 @@
 - 2026-05-21: Phase 1 — `ConfigModule.envFilePath: ['../../.env', '../../.env.local', '.env']` để cả `pnpm api:dev` lẫn `jest e2e` (cwd = apps/api) đều đọc được `.env` ở root.
 - 2026-05-21: Phase 1 — `monthlyRevenueTarget` truyền dạng string (Prisma `Decimal`). DTO dùng `@Transform` coerce number→string + `@ValidateIf` cho null để cho phép xoá target.
 - 2026-05-21: Phase 1 — `jest test`/`test:e2e` thêm `--passWithNoTests` để module BE chưa có unit spec không làm fail gate.
+- 2026-05-21: Phase 3 — Room ↔ Category dùng 4 named relations (`RoomType` / `RoomArea` / `RoomStatus` / `RoomCleaningStatus`) vì Category được reference 4× từ Room. Inverse arrays bắt buộc trên Category.
+- 2026-05-21: Phase 3 — FK `onDelete RESTRICT` cho typeId/statusId/cleaningStatusId (luôn cần category để hiển thị), `SET NULL` cho areaId (optional).
+- 2026-05-21: Phase 3 — Category-group validation ở service layer: `assertCategoryGroup(id, expectedGroup)` chạy trước mọi create/update/status-flip/cleaning-flip để chặn việc gán nhầm group (vd typeId trỏ vào PAYMENT_METHOD).
+- 2026-05-21: Phase 3 — `code` của Room immutable post-creation (UpdateRoomDto vẫn nhận nhưng dialog FE hiển thị read-only) — giữ nhất quán mã phòng đã in trên giấy tờ.
+- 2026-05-21: Phase 3 — Status/Cleaning flip dùng endpoint riêng (`PATCH /rooms/:id/status`, `PATCH /rooms/:id/cleaning`) thay vì PATCH general, để RBAC cho phép RECEPTIONIST đổi status và HOUSEKEEPING đổi cleaning mà không mở quyền edit toàn bộ Room.
+- 2026-05-21: Phase 3 — Inline status/cleaning UX: click badge → DropdownMenu các option của group → mutation. Badge không có quyền render plain (no cursor-pointer).
+- 2026-05-21: Phase 3 — Zustand-persist hydration race trong `(dashboard)/layout.tsx`: thêm `hydrated` flag + 2-stage useEffect. Pattern này áp dụng cho mọi protected layout sau này.
 
 ## Notes for next session
 
@@ -218,9 +256,9 @@ Khi mở session mới, đọc theo thứ tự:
 
 1. `CLAUDE.md` (đã được nạp sẵn)
 2. File này (`PROGRESS.md`)
-3. `PLAN.md` mục "Phase 2 — Categories" để xem chi tiết
+3. `PLAN.md` mục "Phase 4 — Customers" để xem chi tiết
 4. `.claude/agents/backend-engineer.md` + `.claude/agent-memory/backend-engineer/MEMORY.md`
-5. Mở ảnh `TemplateImage/Homestay-Hotel-Workspace-Google-Chrome-5_6_2026-7_16_07-PM.png` (Danh mục) để FE đối chiếu
+5. Template image cho Customers (sẽ chọn khi bắt đầu — likely `7_15_37` hoặc `7_15_40`).
 
 ## Files đã tạo trong Phase 0
 

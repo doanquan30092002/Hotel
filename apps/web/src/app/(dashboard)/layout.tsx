@@ -14,8 +14,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { accessToken, clear, setSession, refreshToken } = useAuthStore();
   const [collapsed, setCollapsed] = useState(false);
   const [checked, setChecked] = useState(false);
+  // Track Zustand persist hydration: on the first server render the store
+  // has null values; we wait one tick so localStorage can hydrate the store.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Wait for Zustand persist to rehydrate from localStorage
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (!accessToken) {
       router.replace('/dang-nhap');
       return;
@@ -36,9 +46,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         clear();
         router.replace('/dang-nhap');
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!checked) return null;
+  if (!hydrated || !checked) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

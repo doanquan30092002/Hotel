@@ -131,6 +131,47 @@ CSS variables trong `globals.css`:
 - All mutations invalidate `CATEGORY_KEYS.all` (which invalidates both list and group-counts).
 - `useToggleActive()` calls `PATCH /categories/:id/toggle-active`.
 
+## Phase 3 UI primitives (in `components/ui/`)
+
+- `textarea.tsx` — native `<textarea>` with Tailwind ring + border + resize-y. Forwarded ref, same height/color tokens as Input.
+
+## Rooms page patterns (Phase 3)
+
+- `formatVnd(n)` in `lib/format.ts` — `Intl.NumberFormat('vi-VN', {style:'decimal'}).format(n) + ' đ'`. Returns '—' for null/undefined.
+- `ROOM_KEYS` mirrors `CATEGORY_KEYS` pattern: `['rooms']`, `['rooms','list',params]`, `['rooms','detail',id]`.
+- `useChangeRoomStatus()` → `PATCH /rooms/:id/status { statusId }`. `useChangeRoomCleaning()` → `PATCH /rooms/:id/cleaning { cleaningStatusId }`.
+- Inline status/cleaning change: DropdownMenu wrapping a Badge (trigger=asChild button). Only rendered when `canChange` is true. Badge has `cursor-pointer hover:opacity-80`.
+- View toggle (Bảng/Lưới): two `<button>` inside `role="group"` div, active = `bg-primary text-primary-foreground`, inactive = `bg-background text-muted-foreground`. Each has `aria-pressed` and `aria-label`.
+- Grid view: `grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`. Card with aspect-ratio image (relative h-36 w-full + next/image fill).
+- Room image placeholder: `<div>` with `BedDouble` icon when `images[0]` is undefined.
+- RoomFormDialog uses `max-w-2xl max-h-[90vh] overflow-y-auto` DialogContent for longer form.
+- Edit dialog shows code as read-only text (no Input) — code is immutable post-creation.
+- Images field: `<Textarea>` with one URL per line. `parseImages()` splits on newline, trims, filters empty.
+- Zod weekendPrice/holidayPrice: `z.union([z.coerce.number().min(0), z.literal('')])` to allow clearing optional price fields.
+
+## Zustand persist hydration gotcha (CRITICAL)
+
+- Zustand `persist` middleware initializes store with null values on server/first render. Even in `'use client'` components with `addInitScript` in Playwright, the store starts null before hydration.
+- Dashboard layout must wait for hydration with a `hydrated` flag state:
+  ```ts
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return; /* auth check */
+  }, [hydrated]);
+  if (!hydrated || !checked) return null;
+  ```
+- Without this, Playwright tests with `addInitScript` for localStorage still redirect to `/dang-nhap`.
+
+## Playwright auth pattern (Phase 3)
+
+- Use `page.addInitScript((auth) => { window.localStorage.setItem('hotel.auth', auth); }, AUTH_JSON)` to inject auth BEFORE page JS runs — more reliable than `page.evaluate` after `goto('/')`.
+- Set up `page.route()` mocks BEFORE `page.goto()`.
+- `/auth/me` mock must return the CORRECT role — the layout calls `setSession()` with the me response, overwriting localStorage user. If you mock ADMIN user but inject RECEPTIONIST auth, page shows ADMIN controls.
+- Separate `MOCK_ME_ADMIN` and `MOCK_ME_RECEPTIONIST` constants; pass role to `setupMocks(page, role)`.
+
 ## Playwright gotcha
 
 - Login page has both `<input aria-label="Mật khẩu">` and a toggle button with `aria-label="Hiện mật khẩu"`. `getByLabel('Mật khẩu')` matches 2 elements → use `.first()` to avoid strict mode violation.

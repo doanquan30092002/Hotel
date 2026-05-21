@@ -78,6 +78,69 @@ await prisma.$transaction(async (tx) => {
 - Seed uses `upsert` keyed on composite unique `(group, code)` — idempotent re-run safe.
 - `group` field is immutable after creation (422 if attempted via service guard).
 
+## Patterns added in Phase 3
+
+### Named Prisma relations (multiple FK to same table)
+
+When a model references the same table multiple times, use named relations on both sides:
+
+```prisma
+// On the "many" side:
+type    Category @relation("RoomType",          fields: [typeId],           references: [id])
+status  Category @relation("RoomStatus",        fields: [statusId],         references: [id])
+
+// On the "one" side (Category model):
+roomsAsType     Room[] @relation("RoomType")
+roomsAsStatus   Room[] @relation("RoomStatus")
+```
+
+### Category group validation helper (service pattern)
+
+```ts
+private async assertCategoryGroup(
+  id: string,
+  expectedGroup: CategoryGroup,
+  fieldLabel: string,
+): Promise<void> {
+  const cat = await this.prisma.category.findFirst({
+    where: { id, deletedAt: null },
+    select: { group: true },
+  });
+  if (!cat) throw new BadRequestException(`${fieldLabel} không tìm thấy danh mục tương ứng`);
+  if (cat.group !== expectedGroup)
+    throw new BadRequestException(`${fieldLabel} phải thuộc nhóm danh mục ${expectedGroup}`);
+}
+```
+
+### Decimal → string in entity (money fields)
+
+```ts
+entity.basePrice = room.basePrice.toString();
+entity.weekendPrice = room.weekendPrice ? room.weekendPrice.toString() : null;
+```
+
+### Nested include constant (type-safe)
+
+```ts
+const ROOM_INCLUDE = {
+  type: { select: { id: true, code: true, name: true } },
+  area: { select: { id: true, code: true, name: true } },
+  status: { select: { id: true, code: true, name: true } },
+  cleaningStatus: { select: { id: true, code: true, name: true } },
+} as const;
+```
+
+Pass as `include: ROOM_INCLUDE` on every query to get nested `{ id, code, name }` objects — never expose raw FK strings alone.
+
+### Partial-update guard pattern (avoid overwriting with undefined)
+
+```ts
+...(dto.code  !== undefined ? { code: dto.code } : {}),
+...('areaId'  in dto        ? { areaId: dto.areaId ?? null } : {}),
+```
+
+Use `'field' in dto` (not `!== undefined`) for optional nullable fields that the client can explicitly set to null.
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

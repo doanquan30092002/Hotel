@@ -224,6 +224,206 @@ async function seedCategories(): Promise<void> {
   console.log(`Seed categories: ${CATEGORY_SEEDS.length} rows upserted`);
 }
 
+async function getCategoryIdByGroupCode(group: CategoryGroup, code: string): Promise<string> {
+  const cat = await prisma.category.findUnique({
+    where: { group_code: { group, code } },
+    select: { id: true },
+  });
+  if (!cat) {
+    throw new Error(`Category not found: group=${group} code=${code}`);
+  }
+  return cat.id;
+}
+
+interface RoomSeed {
+  code: string;
+  name: string;
+  typeCode: string;
+  areaCode: string | null;
+  capacity: number;
+  basePrice: number;
+  weekendPrice: number;
+  holidayPrice: number;
+  defaultCheckIn: string;
+  defaultCheckOut: string;
+}
+
+const ROOM_SEEDS: RoomSeed[] = [
+  // Standard rooms — Tầng 1
+  {
+    code: 'P101',
+    name: 'Phòng 101 – Standard',
+    typeCode: 'single',
+    areaCode: 'f1',
+    capacity: 2,
+    basePrice: 850000,
+    weekendPrice: 950000,
+    holidayPrice: 1150000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  {
+    code: 'P102',
+    name: 'Phòng 102 – Standard',
+    typeCode: 'single',
+    areaCode: 'f1',
+    capacity: 2,
+    basePrice: 850000,
+    weekendPrice: 950000,
+    holidayPrice: 1150000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  // Deluxe rooms — Tầng 2
+  {
+    code: 'P201',
+    name: 'Phòng 201 – Deluxe',
+    typeCode: 'double',
+    areaCode: 'f2',
+    capacity: 2,
+    basePrice: 1500000,
+    weekendPrice: 1700000,
+    holidayPrice: 1900000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  {
+    code: 'P202',
+    name: 'Phòng 202 – Deluxe',
+    typeCode: 'double',
+    areaCode: 'f2',
+    capacity: 2,
+    basePrice: 1500000,
+    weekendPrice: 1700000,
+    holidayPrice: 1900000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  // Family rooms — Tầng 3
+  {
+    code: 'P301',
+    name: 'Phòng 301 – Family',
+    typeCode: 'family',
+    areaCode: 'f3',
+    capacity: 4,
+    basePrice: 1200000,
+    weekendPrice: 1400000,
+    holidayPrice: 1600000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  {
+    code: 'P302',
+    name: 'Phòng 302 – Family',
+    typeCode: 'family',
+    areaCode: 'f3',
+    capacity: 4,
+    basePrice: 1200000,
+    weekendPrice: 1400000,
+    holidayPrice: 1600000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  // Bungalow rooms
+  {
+    code: 'B101',
+    name: 'Bungalow 101',
+    typeCode: 'dorm',
+    areaCode: 'bungalow',
+    capacity: 4,
+    basePrice: 1800000,
+    weekendPrice: 2000000,
+    holidayPrice: 2200000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  {
+    code: 'B102',
+    name: 'Bungalow 102',
+    typeCode: 'dorm',
+    areaCode: 'bungalow',
+    capacity: 4,
+    basePrice: 1800000,
+    weekendPrice: 2000000,
+    holidayPrice: 2200000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  // Villa VIP — Tầng 3
+  {
+    code: 'V101',
+    name: 'Villa VIP 101',
+    typeCode: 'vip',
+    areaCode: 'f3',
+    capacity: 4,
+    basePrice: 2500000,
+    weekendPrice: 2800000,
+    holidayPrice: 3000000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+  {
+    code: 'V102',
+    name: 'Villa VIP 102',
+    typeCode: 'vip',
+    areaCode: 'f3',
+    capacity: 4,
+    basePrice: 2500000,
+    weekendPrice: 2800000,
+    holidayPrice: 3000000,
+    defaultCheckIn: '14:00',
+    defaultCheckOut: '12:00',
+  },
+];
+
+async function seedRooms(): Promise<void> {
+  const statusId = await getCategoryIdByGroupCode(CategoryGroup.ROOM_STATUS, 'ready');
+  const cleaningStatusId = await getCategoryIdByGroupCode(CategoryGroup.CLEANING_STATUS, 'clean');
+
+  for (const seed of ROOM_SEEDS) {
+    const typeId = await getCategoryIdByGroupCode(CategoryGroup.ROOM_TYPE, seed.typeCode);
+    const areaId = seed.areaCode
+      ? await getCategoryIdByGroupCode(CategoryGroup.ROOM_AREA, seed.areaCode)
+      : null;
+
+    await prisma.room.upsert({
+      where: { code: seed.code },
+      update: {
+        name: seed.name,
+        typeId,
+        areaId,
+        capacity: seed.capacity,
+        basePrice: seed.basePrice,
+        weekendPrice: seed.weekendPrice,
+        holidayPrice: seed.holidayPrice,
+        statusId,
+        cleaningStatusId,
+        defaultCheckIn: seed.defaultCheckIn,
+        defaultCheckOut: seed.defaultCheckOut,
+        images: [],
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        name: seed.name,
+        typeId,
+        areaId,
+        capacity: seed.capacity,
+        basePrice: seed.basePrice,
+        weekendPrice: seed.weekendPrice,
+        holidayPrice: seed.holidayPrice,
+        statusId,
+        cleaningStatusId,
+        defaultCheckIn: seed.defaultCheckIn,
+        defaultCheckOut: seed.defaultCheckOut,
+        images: [],
+      },
+    });
+  }
+
+  console.log(`Seed rooms: ${ROOM_SEEDS.length} rows upserted`);
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -254,6 +454,7 @@ async function main() {
   });
 
   await seedCategories();
+  await seedRooms();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }

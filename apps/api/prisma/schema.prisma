@@ -85,8 +85,42 @@ model Category {
   updatedAt DateTime      @updatedAt
   deletedAt DateTime?
 
+  roomsAsType     Room[] @relation("RoomType")
+  roomsAsArea     Room[] @relation("RoomArea")
+  roomsAsStatus   Room[] @relation("RoomStatus")
+  roomsAsCleaning Room[] @relation("RoomCleaningStatus")
+
   @@unique([group, code])
   @@index([group, active, sortOrder])
+}
+
+model Room {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  name             String
+  typeId           String
+  type             Category  @relation("RoomType", fields: [typeId], references: [id])
+  areaId           String?
+  area             Category? @relation("RoomArea", fields: [areaId], references: [id])
+  capacity         Int       @default(2)
+  basePrice        Decimal   @db.Decimal(15, 2)
+  weekendPrice     Decimal?  @db.Decimal(15, 2)
+  holidayPrice     Decimal?  @db.Decimal(15, 2)
+  statusId         String
+  status           Category  @relation("RoomStatus", fields: [statusId], references: [id])
+  cleaningStatusId String
+  cleaningStatus   Category  @relation("RoomCleaningStatus", fields: [cleaningStatusId], references: [id])
+  defaultCheckIn   String?
+  defaultCheckOut  String?
+  images           String[]  @default([])
+  note             String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  @@index([typeId])
+  @@index([statusId])
+  @@index([deletedAt])
 }
 
 model AuditLog {
