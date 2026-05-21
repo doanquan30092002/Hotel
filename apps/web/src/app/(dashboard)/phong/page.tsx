@@ -1322,6 +1322,7 @@ export default function PhongPage() {
   const [statusId, setStatusId] = useState('');
   const [areaId, setAreaId] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const debouncedKeyword = useDebouncedValue(keyword, 300);
 
   // View mode
@@ -1376,7 +1377,7 @@ export default function PhongPage() {
     statusId: statusId || undefined,
     areaId: areaId || undefined,
     page,
-    pageSize: 20,
+    pageSize,
   });
 
   const rooms = roomsData?.data ?? [];
@@ -1636,29 +1637,57 @@ export default function PhongPage() {
         </CardContent>
 
         {/* Pagination */}
-        {!isLoading && !isError && totalPages > 1 && (
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+        {!isLoading && !isError && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
             <span className="text-sm text-muted-foreground">
-              Trang {page} / {totalPages}
+              {totalRooms === 0
+                ? 'Không có dữ liệu'
+                : `Hiển thị ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, totalRooms)} trong tổng ${totalRooms} phòng`}
             </span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              aria-label="Trang trước"
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              aria-label="Trang tiếp"
-            >
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Số dòng / trang</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => {
+                    setPageSize(Number(v));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-[80px]" aria-label="Số dòng mỗi trang">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Trang {page} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                aria-label="Trang trước"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                aria-label="Trang tiếp"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
           </div>
         )}
       </Card>

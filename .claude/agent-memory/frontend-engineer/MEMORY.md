@@ -183,6 +183,75 @@ CSS variables trong `globals.css`:
 - `sidebar-nav.ts` uses React type for icon prop — must be `.ts` not `.tsx` since it only exports data, but the type references `React.ComponentType` which resolves via global JSX namespace (tsconfig includes dom).
 - `(auth)/layout.tsx` uses `React.ReactNode` without import — Next.js 14 global React type works via tsconfig lib.
 
+## Pagination (MANDATORY for every list/table page)
+
+User feedback 2026-05-22: phải luôn hiển thị pagination footer + pageSize picker, KHÔNG ẩn khi `totalPages === 1`. Default `pageSize = 10` (không phải 20).
+
+Template — copy cho mọi trang list mới (Services, Bookings, Housekeeping, Finance, Staff, Payroll, Uploads, Reports):
+
+```tsx
+const [page, setPage] = useState(1);
+const [pageSize, setPageSize] = useState(10);
+// ...useXxx({ page, pageSize, ... })
+const totalPages = meta?.totalPages ?? 1;
+const total = meta?.total ?? items.length;
+
+// Sau CardContent, LUÔN render (không có guard totalPages > 1):
+<div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+  <span className="text-sm text-muted-foreground">
+    {total === 0
+      ? 'Không có dữ liệu'
+      : `Hiển thị ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} trong tổng ${total} <đơn vị>`}
+  </span>
+  <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground">Số dòng / trang</span>
+      <Select
+        value={String(pageSize)}
+        onValueChange={(v) => {
+          setPageSize(Number(v));
+          setPage(1);
+        }}
+      >
+        <SelectTrigger className="h-9 w-[80px]" aria-label="Số dòng mỗi trang">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {[5, 10, 20, 50, 100].map((n) => (
+            <SelectItem key={n} value={String(n)}>
+              {n}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+    <span className="text-sm text-muted-foreground">
+      Trang {page} / {totalPages}
+    </span>
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={() => setPage((p) => Math.max(1, p - 1))}
+      disabled={page <= 1}
+      aria-label="Trang trước"
+    >
+      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+    </Button>
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+      disabled={page >= totalPages}
+      aria-label="Trang tiếp"
+    >
+      <ChevronRight className="h-4 w-4" aria-hidden="true" />
+    </Button>
+  </div>
+</div>;
+```
+
+Reset `page = 1` khi: pageSize đổi, keyword đổi (debounce), filter đổi. Đã áp dụng retroactive cho `/phong` và `/khach-hang` 2026-05-22.
+
 ## Phase 4 patterns (Customers)
 
 - `CUSTOMER_KEYS` mirrors `ROOM_KEYS`: `['customers']`, `['customers','list',params]`, `['customers','detail',id]`.
