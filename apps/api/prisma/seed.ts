@@ -424,6 +424,140 @@ async function seedRooms(): Promise<void> {
   console.log(`Seed rooms: ${ROOM_SEEDS.length} rows upserted`);
 }
 
+interface CustomerSeed {
+  code: string;
+  fullName: string;
+  phone: string;
+  idNumber: string;
+  email: string;
+  address: string;
+  sourceCode: 'individual' | 'group' | 'corporate';
+}
+
+const CUSTOMER_SEEDS: CustomerSeed[] = [
+  {
+    code: 'KH001',
+    fullName: 'Nguyễn Minh Anh',
+    phone: '0901234001',
+    idNumber: '001234567001',
+    email: 'kh001@example.com',
+    address: 'Hà Nội',
+    sourceCode: 'individual',
+  },
+  {
+    code: 'KH002',
+    fullName: 'Trần Hải Yến',
+    phone: '0901234002',
+    idNumber: '001234567002',
+    email: 'kh002@example.com',
+    address: 'Đà Nẵng',
+    sourceCode: 'individual',
+  },
+  {
+    code: 'KH003',
+    fullName: 'Lê Quốc Bảo',
+    phone: '0901234003',
+    idNumber: '001234567003',
+    email: 'kh003@example.com',
+    address: 'Đà Lạt',
+    sourceCode: 'group',
+  },
+  {
+    code: 'KH004',
+    fullName: 'Phạm Thu Trang',
+    phone: '0901234004',
+    idNumber: '001234567004',
+    email: 'kh004@example.com',
+    address: 'Nha Trang',
+    sourceCode: 'individual',
+  },
+  {
+    code: 'KH005',
+    fullName: 'Ngô Đức Long',
+    phone: '0901234005',
+    idNumber: '001234567005',
+    email: 'kh005@example.com',
+    address: 'Bình Dương',
+    sourceCode: 'group',
+  },
+  {
+    code: 'KH006',
+    fullName: 'Hoàng Gia Linh',
+    phone: '0901234006',
+    idNumber: '001234567006',
+    email: 'kh006@example.com',
+    address: 'Cần Thơ',
+    sourceCode: 'individual',
+  },
+  {
+    code: 'KH007',
+    fullName: 'Vũ Hoài Nam',
+    phone: '0901234007',
+    idNumber: '001234567007',
+    email: 'kh007@example.com',
+    address: 'Tây Ninh',
+    sourceCode: 'group',
+  },
+  {
+    code: 'KH008',
+    fullName: 'Đỗ Khánh Ly',
+    phone: '0901234008',
+    idNumber: '001234567008',
+    email: 'kh008@example.com',
+    address: 'Huế',
+    sourceCode: 'individual',
+  },
+  {
+    code: 'KH009',
+    fullName: 'Công ty Minh Phát',
+    phone: '0901234009',
+    idNumber: '001234567009',
+    email: 'kh009@example.com',
+    address: 'Hà Nội',
+    sourceCode: 'corporate',
+  },
+  {
+    code: 'KH010',
+    fullName: 'Bùi Nhật Hạ',
+    phone: '0901234010',
+    idNumber: '001234567010',
+    email: 'kh010@example.com',
+    address: 'TP Thủ Đức',
+    sourceCode: 'individual',
+  },
+];
+
+async function seedCustomers(): Promise<void> {
+  for (const seed of CUSTOMER_SEEDS) {
+    const sourceId = await getCategoryIdByGroupCode(CategoryGroup.GUEST_SOURCE, seed.sourceCode);
+
+    await prisma.customer.upsert({
+      where: { code: seed.code },
+      update: {
+        fullName: seed.fullName,
+        phone: seed.phone,
+        idNumber: seed.idNumber,
+        email: seed.email,
+        address: seed.address,
+        sourceId,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        fullName: seed.fullName,
+        phone: seed.phone,
+        idNumber: seed.idNumber,
+        email: seed.email,
+        address: seed.address,
+        sourceId,
+        docs: [],
+      },
+    });
+  }
+
+  console.log(`Seed customers: ${CUSTOMER_SEEDS.length} rows upserted`);
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -455,6 +589,7 @@ async function main() {
 
   await seedCategories();
   await seedRooms();
+  await seedCustomers();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }

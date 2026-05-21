@@ -183,6 +183,15 @@ CSS variables trong `globals.css`:
 - `sidebar-nav.ts` uses React type for icon prop — must be `.ts` not `.tsx` since it only exports data, but the type references `React.ComponentType` which resolves via global JSX namespace (tsconfig includes dom).
 - `(auth)/layout.tsx` uses `React.ReactNode` without import — Next.js 14 global React type works via tsconfig lib.
 
+## Phase 4 patterns (Customers)
+
+- `CUSTOMER_KEYS` mirrors `ROOM_KEYS`: `['customers']`, `['customers','list',params]`, `['customers','detail',id]`.
+- RBAC for customers: `canAdd/canEdit = hasRole('ADMIN','MANAGER','RECEPTIONIST')`, `canDelete = hasRole('ADMIN','MANAGER')` — HOUSEKEEPING sees no Add button and no Edit/Delete.
+- `Avatar` component in `components/ui/avatar.tsx` is a custom component (NOT radix-based). Props: `{ src?, name?, size?, className? }`. Renders initials internally — do NOT import AvatarFallback.
+- Docs field: render as existence indicator only (FileText badge with count) in table; plain text count in detail dialog. No upload UI — deferred to Phase 12.
+- Detail dialog "Lịch sử" section: static placeholder text "Sẽ hiển thị lịch sử booking ở Phase 6".
+- Grid card layout: `Avatar name={c.fullName} size={40}` + code (mono xs) + fullName (semibold sm) + 3 body lines with Phone/CreditCard/MapPin icons + footer source badge + actions row.
+
 ## Decisions
 
 - 2026-05-21: TanStack Query staleTime mặc định 30s cho list, 0 cho detail.

@@ -2,9 +2,9 @@
 
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
-**Last updated**: 2026-05-21
-**Current phase**: Phase 3 — Rooms (Phòng) ✓ (review + test gate PASS — 81/81 e2e + 17/17 Playwright)
-**Active branch**: `feat/03-rooms`
+**Last updated**: 2026-05-22
+**Current phase**: Phase 4 — Customers (Khách hàng) ✓ (review + test gate PASS — 115/115 e2e + 27/27 Playwright)
+**Active branch**: `feat/04-customers`
 
 ## Phase status
 
@@ -43,7 +43,13 @@
   - [x] FE: Fix Zustand-persist hydration race trong `(dashboard)/layout.tsx` (hydrated flag + 2-stage useEffect)
   - [x] Tester gate: 81/81 e2e PASS (6 suites: health/auth/users/settings/categories/rooms — 29 mới) + 17/17 Playwright PASS (11 mới)
   - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 6 nit non-blocking — gồm gợi ý gộp 4 reference-category queries, totalCapacity per-page vs all-pages)
-- [ ] 4. Customers (Khách hàng)
+- [x] **4. Customers (Khách hàng)**
+  - [x] BE: `Customer` model (unique phone/idNumber, nullable, multi-NULL allowed) + relation `CustomerSource → Category(GUEST_SOURCE)` + migration `04_customers` + seed 10 KH001..KH010
+  - [x] BE: 5 endpoint `/api/v1/customers` — list (filter sourceId + keyword qua fullName/phone/idNumber/email/code) / get / create / patch / delete (soft). RBAC: GET all roles, POST/PATCH = ADMIN/MANAGER/RECEPTIONIST, DELETE = ADMIN/MANAGER only.
+  - [x] BE: Soft-delete resurrection on same `code`; conflict trên phone/idNumber khác code → 409 đúng message tiếng Việt. Phone regex `^\+?[0-9]{8,15}$`. `assertCategoryGroup(sourceId, GUEST_SOURCE)`.
+  - [x] FE: `/khach-hang` — toolbar (search + source select + Bảng/Lưới toggle + add) + Bảng view (9 cột match `7_15_37`) + Lưới view (4-col cards với Avatar initials) + dialog create/edit/detail + delete confirm + loading/empty/error states. RBAC nghiêm: HOUSEKEEPING không thấy Add/Edit/Delete; RECEPTIONIST có Edit nhưng không Delete.
+  - [x] Tester gate: 115/115 e2e PASS (7 suites: health/auth/users/settings/categories/rooms/customers — 34 mới) + 27/27 Playwright PASS (10 mới). Infra fix: `--runInBand` cho `api:test:e2e` + `testTimeout: 60000` trong `jest-e2e.json` để tránh parallel bootstrap race.
+  - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 4 nit non-blocking — gồm gợi ý map `GUEST_SOURCE` raw enum sang label tiếng Việt trong error message).
 - [ ] 5. Services + Price Packages
 - [ ] 6. Bookings (CORE)
 - [ ] 7. Calendar booking
@@ -58,9 +64,29 @@
 
 ## Currently working on
 
-- **Status**: Phase 3 (Rooms) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 4 (Customers / Khách hàng).
-- **Phase 3 result**: BE 81/81 e2e PASS (6 suites), FE 17/17 Playwright PASS, lint+typecheck clean cả BE và FE. Code-review PASS với 0 Critical / 0 Major / 6 nit.
-- **Next phase prep (Phase 4 — Customers)**: `Customer` model (id, code, fullName, phone unique, idNumber unique, email, address, nationality, sourceId→GUEST_SOURCE, note, docs[]). CRUD + unique constraints + soft-delete. Trang `/khach-hang` list+form. Upload giấy tờ sẽ hoãn sang Phase 12.
+- **Status**: Phase 4 (Customers) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 5 (Services + Price Packages).
+- **Phase 4 result**: BE 115/115 e2e PASS (7 suites), FE 27/27 Playwright PASS, lint+typecheck clean. Code-review PASS với 0 Critical / 0 Major / 4 nit.
+- **Infra change picked up bởi tester**: `apps/api/package.json` thêm `--runInBand` cho `test:e2e`, `apps/api/test/jest-e2e.json` thêm `testTimeout: 60000` — tránh parallel bootstrap timeouts trên Windows.
+- **Next phase prep (Phase 5 — Services + Price Packages)**: 2 model `Service` (id, code, name, groupId→SERVICE_GROUP, unit→UNIT, price Decimal, status, note) và `PricePackage` (id, code, name, applyType, numNights, numGuests, totalPrice, validFrom, validTo, detail, status). 2 trang `/dich-vu` (template `7_15_40`) và `/goi-mau` (template `7_15_43`).
+
+### Phase 4 — files (BE)
+
+- `apps/api/src/customers/customers.module.ts` / `.service.ts` / `.controller.ts`
+- `apps/api/src/customers/dto/create-customer.dto.ts` / `update-customer.dto.ts` / `query-customer.dto.ts`
+- `apps/api/src/customers/entities/customer.entity.ts` — strips `deletedAt`, nests source `{id, code, name} | null`
+- `apps/api/prisma/schema.prisma` — Customer model + `customers Customer[] @relation("CustomerSource")` inverse on Category
+- `apps/api/prisma/migrations/20260521170555_04_customers/migration.sql`
+- `apps/api/prisma/seed.ts` — `CUSTOMER_SEEDS` (10 rows) + `seedCustomers()`
+- `apps/api/src/app.module.ts` — registered CustomersModule
+- `apps/api/test/customers.e2e-spec.ts` — 34 tests
+- `apps/api/package.json` + `apps/api/test/jest-e2e.json` — `--runInBand` + `testTimeout: 60000` (infra fix)
+
+### Phase 4 — files (FE)
+
+- `apps/web/src/types/customer.ts`
+- `apps/web/src/lib/hooks/use-customers.ts` — `CUSTOMER_KEYS` + 5 hooks
+- `apps/web/src/app/(dashboard)/khach-hang/page.tsx` — full implementation (replaced ComingSoon)
+- `apps/web/tests/khach-hang.spec.ts` — 10 offline Playwright tests
 
 ### Phase 3 — files (BE)
 
@@ -256,9 +282,9 @@ Khi mở session mới, đọc theo thứ tự:
 
 1. `CLAUDE.md` (đã được nạp sẵn)
 2. File này (`PROGRESS.md`)
-3. `PLAN.md` mục "Phase 4 — Customers" để xem chi tiết
+3. `PLAN.md` mục "Phase 5 — Services + Price Packages" để xem chi tiết
 4. `.claude/agents/backend-engineer.md` + `.claude/agent-memory/backend-engineer/MEMORY.md`
-5. Template image cho Customers (sẽ chọn khi bắt đầu — likely `7_15_37` hoặc `7_15_40`).
+5. Template images: `7_15_40` (Dịch vụ) và `7_15_43` (Gói mẫu).
 
 ## Files đã tạo trong Phase 0
 

@@ -90,6 +90,8 @@ model Category {
   roomsAsStatus   Room[] @relation("RoomStatus")
   roomsAsCleaning Room[] @relation("RoomCleaningStatus")
 
+  customers Customer[] @relation("CustomerSource")
+
   @@unique([group, code])
   @@index([group, active, sortOrder])
 }
@@ -121,6 +123,28 @@ model Room {
   @@index([typeId])
   @@index([statusId])
   @@index([deletedAt])
+}
+
+model Customer {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  fullName    String
+  phone       String?   @unique
+  idNumber    String?   @unique
+  email       String?
+  address     String?
+  nationality String?
+  sourceId    String?
+  source      Category? @relation("CustomerSource", fields: [sourceId], references: [id])
+  note        String?
+  docs        String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([sourceId])
+  @@index([deletedAt])
+  @@index([fullName])
 }
 
 model AuditLog {

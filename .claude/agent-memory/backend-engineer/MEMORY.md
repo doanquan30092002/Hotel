@@ -141,6 +141,55 @@ Pass as `include: ROOM_INCLUDE` on every query to get nested `{ id, code, name }
 
 Use `'field' in dto` (not `!== undefined`) for optional nullable fields that the client can explicitly set to null.
 
+## Patterns added in Phase 4
+
+### Type-safe unique-field lookup (avoid computed key casting)
+
+When querying `findUnique` on a field that is one of several unique columns, use a conditional
+expression rather than a dynamic computed key cast, to satisfy Prisma's strict union type:
+
+```ts
+const where: Prisma.CustomerWhereUniqueInput =
+  field === 'phone' ? { phone: value } : { idNumber: value };
+const existing = await this.prisma.customer.findUnique({
+  where,
+  select: { id: true, deletedAt: true },
+});
+```
+
+### Resurrection pattern with phone/idNumber soft-delete
+
+When `phone` and `idNumber` are `@unique` and nullable, a soft-deleted row still occupies the
+unique index. Strategy:
+
+1. Pre-check phone/idNumber with `assertUniqueField()` — if the conflicting row has `deletedAt !== null` it is NOT a live conflict (skip).
+2. Check code uniqueness: if soft-deleted with same code → resurrect (update + clear deletedAt). If active with same code → 409.
+3. If phone/idNumber conflict is a LIVE row (different code) → 409 with Vietnamese message.
+4. Keep P2002 catch as a defensive fallback, inspecting `err.meta.target[]` to identify which field.
+
+### Keyword search across multiple nullable string fields
+
+```ts
+OR: [
+  { fullName: { contains: keyword, mode: 'insensitive' } },
+  { phone:    { contains: keyword, mode: 'insensitive' } },
+  { idNumber: { contains: keyword, mode: 'insensitive' } },
+  { email:    { contains: keyword, mode: 'insensitive' } },
+  { code:     { contains: keyword, mode: 'insensitive' } },
+],
+```
+
+Prisma handles nullable fields gracefully — `contains` on a null column simply doesn't match.
+
+### URL-encoding in e2e tests
+
+When a keyword or query param contains non-ASCII characters (Vietnamese), supertest/superagent
+throws "Request path contains unescaped characters". Always wrap with `encodeURIComponent()`:
+
+```ts
+.get(`/api/v1/customers?keyword=${encodeURIComponent('Nguyễn Minh Anh')}`)
+```
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.
