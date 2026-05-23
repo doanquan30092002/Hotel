@@ -267,3 +267,17 @@ Reset `page = 1` khi: pageSize đổi, keyword đổi (debounce), filter đổi.
 - 2026-05-21: 401 trên axios → tự refresh access token một lần, nếu vẫn 401 → redirect `/dang-nhap`.
 - 2026-05-21: Toast dùng module-level store (không cần context/zustand riêng). `toast()` imperative API.
 - 2026-05-21: Auth store persisted to `hotel.auth` (JSON), themeTone to `hotel.themeTone` (string).
+
+## Phase 5 patterns (Services + Price Packages)
+
+- `SERVICE_KEYS` / `PACKAGE_KEYS` follow same shape as `ROOM_KEYS` / `CUSTOMER_KEYS`: `['services']` base, `['services','list',params]`, `['services','detail',id]`.
+- Services page uses `useCategories({ group: 'SERVICE_GROUP', active: true, pageSize: 100 })` and `useCategories({ group: 'UNIT', active: true, pageSize: 100 })` for dropdown options — same hook, different `group` param.
+- RBAC for both pages: `canWrite = hasRole('ADMIN', 'MANAGER')`. RECEPTIONIST and HOUSEKEEPING get read-only (no Add/Edit/Delete).
+- Package form uses Zod `.refine()` for cross-field validation: `validTo >= validFrom`. Path is `['validTo']` so the error appears on the `validTo` field.
+- `formatDate(iso)` helper splits YYYY-MM-DD string and returns DD/MM/YYYY — avoids timezone issues from `new Date()` parsing.
+- Playwright strict mode fix: when `getByText()` matches multiple elements, use `getByRole('columnheader', { name: ... })` for table headers, `getByRole('cell', { name: ..., exact: true })` for table cells with exact match.
+- Playwright workers: run `--workers=2` when 4 workers cause timeout race on unauthenticated redirect tests (server cold start with 4 parallel navigations to unloaded pages). Tests pass at 2 workers.
+- `import type { Package as PricePackage }` — rename to avoid conflict with built-in `Package` type if any; clearer intent.
+- `Switch` component imported from `@/components/ui/switch` — available since Phase 2. Used for active/inactive toggle in form dialogs.
+- Date inputs: use `<Input type="date">` with `aria-invalid`. BE expects ISO date string `YYYY-MM-DD` which is exactly what `<input type="date">` produces.
+- Static apply type list for packages: `['Standard', 'VillaVIP', 'Bungalow', 'Family', 'Deluxe']` as `const` — not fetched from BE. Update if BE adds more types.

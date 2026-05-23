@@ -185,6 +185,11 @@ const CATEGORY_SEEDS: CategorySeed[] = [
   { group: CategoryGroup.UNIT, code: 'person', name: 'Người', sortOrder: 2 },
   { group: CategoryGroup.UNIT, code: 'session', name: 'Lượt', sortOrder: 3 },
   { group: CategoryGroup.UNIT, code: 'hour', name: 'Giờ', sortOrder: 4 },
+  { group: CategoryGroup.UNIT, code: 'lan', name: 'Lần', sortOrder: 5 },
+  { group: CategoryGroup.UNIT, code: 'suat', name: 'Suất', sortOrder: 6 },
+  { group: CategoryGroup.UNIT, code: 'chai', name: 'Chai', sortOrder: 7 },
+  { group: CategoryGroup.UNIT, code: 'kg', name: 'Kg', sortOrder: 8 },
+  { group: CategoryGroup.UNIT, code: 'goi', name: 'Gói', sortOrder: 9 },
 
   // SERVICE_GROUP
   { group: CategoryGroup.SERVICE_GROUP, code: 'food', name: 'Ăn uống', sortOrder: 0 },
@@ -192,6 +197,7 @@ const CATEGORY_SEEDS: CategorySeed[] = [
   { group: CategoryGroup.SERVICE_GROUP, code: 'transport', name: 'Đưa đón', sortOrder: 2 },
   { group: CategoryGroup.SERVICE_GROUP, code: 'spa', name: 'Spa', sortOrder: 3 },
   { group: CategoryGroup.SERVICE_GROUP, code: 'other', name: 'Khác', sortOrder: 4 },
+  { group: CategoryGroup.SERVICE_GROUP, code: 'surcharge', name: 'Phụ thu', sortOrder: 5 },
 
   // SURCHARGE_TYPE
   { group: CategoryGroup.SURCHARGE_TYPE, code: 'extra_hour', name: 'Phụ thu giờ', sortOrder: 0 },
@@ -558,6 +564,161 @@ async function seedCustomers(): Promise<void> {
   console.log(`Seed customers: ${CUSTOMER_SEEDS.length} rows upserted`);
 }
 
+interface ServiceSeed {
+  code: string;
+  name: string;
+  groupCode: string;
+  unitCode: string;
+  price: number;
+}
+
+const SERVICE_SEEDS: ServiceSeed[] = [
+  { code: 'DV001', name: 'Ăn sáng', groupCode: 'food', unitCode: 'suat', price: 80000 },
+  {
+    code: 'DV002',
+    name: 'Hồ bơi & thư giãn',
+    groupCode: 'other',
+    unitCode: 'session',
+    price: 350000,
+  },
+  {
+    code: 'DV003',
+    name: 'Đưa đón sân bay',
+    groupCode: 'transport',
+    unitCode: 'session',
+    price: 200000,
+  },
+  { code: 'DV004', name: 'BBQ tối', groupCode: 'food', unitCode: 'suat', price: 450000 },
+  { code: 'DV005', name: 'Giặt ủi', groupCode: 'laundry', unitCode: 'kg', price: 50000 },
+  { code: 'DV006', name: 'Minibar', groupCode: 'other', unitCode: 'lan', price: 250000 },
+  { code: 'DV007', name: 'Trang trí phòng', groupCode: 'other', unitCode: 'goi', price: 350000 },
+];
+
+async function seedServices(): Promise<void> {
+  for (const seed of SERVICE_SEEDS) {
+    const groupId = await getCategoryIdByGroupCode(CategoryGroup.SERVICE_GROUP, seed.groupCode);
+    const unitId = await getCategoryIdByGroupCode(CategoryGroup.UNIT, seed.unitCode);
+
+    await prisma.service.upsert({
+      where: { code: seed.code },
+      update: {
+        name: seed.name,
+        groupId,
+        unitId,
+        price: seed.price,
+        active: true,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        name: seed.name,
+        groupId,
+        unitId,
+        price: seed.price,
+        active: true,
+      },
+    });
+  }
+
+  console.log(`Seed services: ${SERVICE_SEEDS.length} rows upserted`);
+}
+
+interface PricePackageSeed {
+  code: string;
+  name: string;
+  applyType: string;
+  numNights: number;
+  numGuests: number;
+  totalPrice: number;
+  validFrom: string;
+  validTo: string;
+}
+
+const PRICE_PACKAGE_SEEDS: PricePackageSeed[] = [
+  {
+    code: 'GOI001',
+    name: 'Combo đôi 24/06',
+    applyType: 'Deluxe',
+    numNights: 1,
+    numGuests: 2,
+    totalPrice: 1750000,
+    validFrom: '2026-01-01',
+    validTo: '2026-12-31',
+  },
+  {
+    code: 'GOI002',
+    name: 'Combo gia đình 3N2D',
+    applyType: 'Family',
+    numNights: 3,
+    numGuests: 4,
+    totalPrice: 4500000,
+    validFrom: '2026-01-01',
+    validTo: '2026-12-31',
+  },
+  {
+    code: 'GOI003',
+    name: 'Combo cuối tuần bungalow',
+    applyType: 'Bungalow',
+    numNights: 2,
+    numGuests: 2,
+    totalPrice: 2550000,
+    validFrom: '2026-01-01',
+    validTo: '2026-12-31',
+  },
+  {
+    code: 'GOI004',
+    name: 'Combo honeymoon',
+    applyType: 'VillaVIP',
+    numNights: 2,
+    numGuests: 2,
+    totalPrice: 3450000,
+    validFrom: '2026-01-01',
+    validTo: '2026-12-31',
+  },
+  {
+    code: 'GOI005',
+    name: 'Combo công tác 2 đêm',
+    applyType: 'Standard',
+    numNights: 2,
+    numGuests: 1,
+    totalPrice: 1650000,
+    validFrom: '2026-01-01',
+    validTo: '2026-12-31',
+  },
+];
+
+async function seedPricePackages(): Promise<void> {
+  for (const seed of PRICE_PACKAGE_SEEDS) {
+    await prisma.pricePackage.upsert({
+      where: { code: seed.code },
+      update: {
+        name: seed.name,
+        applyType: seed.applyType,
+        numNights: seed.numNights,
+        numGuests: seed.numGuests,
+        totalPrice: seed.totalPrice,
+        validFrom: new Date(seed.validFrom),
+        validTo: new Date(seed.validTo),
+        active: true,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        name: seed.name,
+        applyType: seed.applyType,
+        numNights: seed.numNights,
+        numGuests: seed.numGuests,
+        totalPrice: seed.totalPrice,
+        validFrom: new Date(seed.validFrom),
+        validTo: new Date(seed.validTo),
+        active: true,
+      },
+    });
+  }
+
+  console.log(`Seed price packages: ${PRICE_PACKAGE_SEEDS.length} rows upserted`);
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -590,6 +751,8 @@ async function main() {
   await seedCategories();
   await seedRooms();
   await seedCustomers();
+  await seedServices();
+  await seedPricePackages();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }

@@ -2,9 +2,9 @@
 
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
-**Last updated**: 2026-05-22
-**Current phase**: Phase 4 — Customers (Khách hàng) ✓ (review + test gate PASS — 115/115 e2e + 27/27 Playwright)
-**Active branch**: `feat/04-customers`
+**Last updated**: 2026-05-23
+**Current phase**: Phase 5 — Services + Price Packages ✓ (review + test gate PASS — 191/191 e2e + 54/54 Playwright)
+**Active branch**: `master`
 
 ## Phase status
 
@@ -50,7 +50,16 @@
   - [x] FE: `/khach-hang` — toolbar (search + source select + Bảng/Lưới toggle + add) + Bảng view (9 cột match `7_15_37`) + Lưới view (4-col cards với Avatar initials) + dialog create/edit/detail + delete confirm + loading/empty/error states. RBAC nghiêm: HOUSEKEEPING không thấy Add/Edit/Delete; RECEPTIONIST có Edit nhưng không Delete.
   - [x] Tester gate: 115/115 e2e PASS (7 suites: health/auth/users/settings/categories/rooms/customers — 34 mới) + 27/27 Playwright PASS (10 mới). Infra fix: `--runInBand` cho `api:test:e2e` + `testTimeout: 60000` trong `jest-e2e.json` để tránh parallel bootstrap race.
   - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 4 nit non-blocking — gồm gợi ý map `GUEST_SOURCE` raw enum sang label tiếng Việt trong error message).
-- [ ] 5. Services + Price Packages
+- [x] **5. Services + Price Packages**
+  - [x] BE: `Service` model (FK groupId→SERVICE_GROUP, unitId→UNIT, Decimal price) + `PricePackage` model (applyType free-text, numNights/numGuests Int, totalPrice Decimal, validFrom/validTo @db.Date, detail) + migration `05_services_packages` + Category inverse relations (`servicesAsGroup`, `servicesAsUnit`) + seed 7 services (DV001..DV007) + 5 price packages (GOI001..GOI005). UNIT seed extended với codes `lan/suat/chai/kg/goi`.
+  - [x] BE: 5 endpoint `/api/v1/services` (list filter groupId/unitId/active/keyword + pagination, get, create, patch, delete) — `assertCategoryGroup(groupId, SERVICE_GROUP)` + `assertCategoryGroup(unitId, UNIT)`, soft-delete resurrection on same code, code immutable post-create. RBAC: GET all, POST/PATCH/DELETE = ADMIN/MANAGER.
+  - [x] BE: 5 endpoint `/api/v1/packages` (list filter applyType/active/keyword + pagination, get, create, patch, delete) — `validTo >= validFrom` → 422 (PATCH cũng kiểm tra cross-field bằng `dto.validFrom ?? existing.validFrom`). Decimal accept number|string. RBAC same as services.
+  - [x] FE: types `service.ts`, `package.ts` + hooks `use-services.ts`, `use-packages.ts` (`SERVICE_KEYS`/`PACKAGE_KEYS` + 5 hooks each)
+  - [x] FE: `/dich-vu` — toolbar (search + group select + unit select + add) + table (8 cols match `7_15_40`: Mã/Tên/Nhóm/Đơn vị/Đơn giá/Trạng thái/Ghi chú/Thao tác) + dialog create/edit + delete confirm + RBAC (ADMIN/MANAGER write-only) + loading/empty/error states. Pagination footer always visible với pageSize picker.
+  - [x] FE: `/goi-mau` — toolbar (search + applyType select static dropdown + add) + table (10 cols match `7_15_43`: Mã/Tên gói/Loại/Số đêm/Số khách/Giá/Hiệu lực/Chi tiết/Trạng thái/Thao tác) + dialog create/edit với date validation client-side (Zod `validTo >= validFrom`) + delete confirm + RBAC + states. `formatDate(iso)` split-on-`-` để tránh UTC timezone shift.
+  - [x] Tester gate: 191/191 e2e PASS (9 suites: health/auth/users/settings/categories/rooms/customers/services/packages — 76 mới: 36 services + 40 packages) + 54/54 Playwright PASS (27 mới: 13 dich-vu + 14 goi-mau).
+  - [x] Code-reviewer gate: PASS (0 Critical, 1 Major non-blocking — pre-existing CRLF/prettier issue, fixed bằng `endOfLine: "auto"` + `.gitattributes` mới, 7 nit).
+  - [x] Infra fix: `.prettierrc` → `endOfLine: "auto"` (cross-platform) + thêm `.gitattributes` (`* text=auto eol=lf`, `*.{cmd,bat,ps1} eol=crlf`, image binaries) để chuẩn hóa line endings cho repo.
 - [ ] 6. Bookings (CORE)
 - [ ] 7. Calendar booking
 - [ ] 8. Tìm phòng trống nhanh
@@ -64,10 +73,11 @@
 
 ## Currently working on
 
-- **Status**: Phase 4 (Customers) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 5 (Services + Price Packages).
-- **Phase 4 result**: BE 115/115 e2e PASS (7 suites), FE 27/27 Playwright PASS, lint+typecheck clean. Code-review PASS với 0 Critical / 0 Major / 4 nit.
-- **Infra change picked up bởi tester**: `apps/api/package.json` thêm `--runInBand` cho `test:e2e`, `apps/api/test/jest-e2e.json` thêm `testTimeout: 60000` — tránh parallel bootstrap timeouts trên Windows.
-- **Next phase prep (Phase 5 — Services + Price Packages)**: 2 model `Service` (id, code, name, groupId→SERVICE_GROUP, unit→UNIT, price Decimal, status, note) và `PricePackage` (id, code, name, applyType, numNights, numGuests, totalPrice, validFrom, validTo, detail, status). 2 trang `/dich-vu` (template `7_15_40`) và `/goi-mau` (template `7_15_43`).
+- **Status**: Phase 5 (Services + Price Packages) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 6 (Bookings — CORE).
+- **Branch policy đổi**: User chỉ định merge tất cả nhánh `feat/01..04` vào `master` và làm trực tiếp trên `master` từ Phase 5 trở đi (fast-forward, không qua PR). `feat/05-services-packages` rỗng đã xóa.
+- **Phase 5 result**: BE 191/191 e2e PASS (9 suites — 76 mới), FE 54/54 Playwright PASS (27 mới), lint 0w/typecheck 0e cả 2 workspace. Code-review PASS với 0 Critical / 1 Major đã fix / 7 nit.
+- **Infra fix Phase 5**: `.prettierrc` `endOfLine: "lf"` → `"auto"` để không vướng CRLF trên Windows + thêm `.gitattributes` chuẩn hóa line endings cho check-out tương lai.
+- **Next phase prep (Phase 6 — Bookings CORE)**: Đây là module lõi nhất. Cần 3 model `Booking` (code, customerId, sourceId, statusId, priceTypeId, checkIn/Out, adults/children, total/paid/remaining), `BookingItem` (polymorphic theo `kind`: room|service|surcharge|discount), `Payment` (bookingId, methodId, amount, paidAt). Tính total/paid/remaining trên service layer. Anti-overlap check khi book cùng phòng. Auto-create customer khi POST booking với phone mới. Template chính: `7_15_45` (list), `7_15_50` (modal tạo booking đa dòng), `7_15_56` (chi tiết).
 
 ### Phase 4 — files (BE)
 

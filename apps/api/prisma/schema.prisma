@@ -92,6 +92,9 @@ model Category {
 
   customers Customer[] @relation("CustomerSource")
 
+  servicesAsGroup Service[] @relation("ServiceGroup")
+  servicesAsUnit  Service[] @relation("ServiceUnit")
+
   @@unique([group, code])
   @@index([group, active, sortOrder])
 }
@@ -145,6 +148,45 @@ model Customer {
   @@index([sourceId])
   @@index([deletedAt])
   @@index([fullName])
+}
+
+model Service {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String
+  groupId   String
+  group     Category  @relation("ServiceGroup", fields: [groupId], references: [id])
+  unitId    String
+  unit      Category  @relation("ServiceUnit", fields: [unitId], references: [id])
+  price     Decimal   @db.Decimal(15, 2)
+  active    Boolean   @default(true)
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([groupId])
+  @@index([deletedAt])
+}
+
+model PricePackage {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  name       String
+  applyType  String
+  numNights  Int
+  numGuests  Int
+  totalPrice Decimal   @db.Decimal(15, 2)
+  validFrom  DateTime  @db.Date
+  validTo    DateTime  @db.Date
+  detail     String?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  @@index([deletedAt])
+  @@index([validFrom, validTo])
 }
 
 model AuditLog {
