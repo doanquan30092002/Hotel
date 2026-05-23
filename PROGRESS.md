@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-23
-**Current phase**: Phase 6 — Bookings ✓ (review + test gate PASS — 233/233 e2e + 69/69 Playwright)
+**Current phase**: Phase 7 — Calendar booking FE ✓ (80/80 Playwright, lint 0w, typecheck 0e)
 **Active branch**: `master`
 
 ## Phase status
@@ -69,7 +69,8 @@
   - [x] FE: `BookingFormDialog` (max-w-5xl) — 4 sections theo `7_15_50`: Thông tin booking (status/priceType/source/package + check-in/out date+time + adults/children/numRooms/note) + Khách hàng (existing combobox auto-fill, manual fallback) + Chi tiết linh hoạt (4 chip buttons add row, `useFieldArray` table với kind-conditional Select column, auto-fill room/service unit price) + Thanh toán nhiều đợt (`useFieldArray` payments) + computed live totals footer. Mode=create|edit|view.
   - [x] Tester gate: 233/233 e2e PASS (10 suites: health/auth/users/settings/categories/rooms/customers/services/packages/bookings — 42 mới) + 69/69 Playwright PASS (15 mới: booking). lint 0w / typecheck 0e cả 2 workspace.
   - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 0 nit — self-review do subagent hit rate limit; verified anti-overlap, totals computation, customer resolver priority, RBAC split, pagination MANDATORY, status palette).
-- [ ] 7. Calendar booking
+- [x] **7. Calendar booking** (FE complete — 80/80 Playwright; BE in parallel)
+  - [x] BE: `GET /api/v1/calendar?from&to&view&typeId&statusId&sourceId&keyword` — read-only endpoint, no new models, 25/25 e2e PASS (258 total)
 - [ ] 8. Tìm phòng trống nhanh
 - [ ] 9. Housekeeping
 - [ ] 10. Finance (Thu chi)
@@ -81,10 +82,28 @@
 
 ## Currently working on
 
-- **Status**: Phase 6 (Bookings CORE) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 7 (Calendar booking).
+- **Status**: Phase 7 (Calendar booking) HOÀN TẤT — BE 258/258 e2e, FE 80/80 Playwright, lint 0w / typecheck 0e cả 2 workspace.
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 6 result**: BE 233/233 e2e (10 suites — 42 mới), FE 69/69 Playwright (15 mới), lint 0w / typecheck 0e cả 2 workspace. Self-review PASS với 0 Critical / 0 Major / 0 nit.
-- **Next phase prep (Phase 7 — Calendar booking)**: Endpoint `GET /api/v1/calendar?from&to&view&typeId&statusId&sourceId&keyword` trả về bookings + rooms + chiếm dụng/ô lưới theo view (month/week/day). FE: trang `/lich` với view switcher 3 mode + filter bar + grid render. Template chính: `7_15_15` (Tháng), `7_15_18` (Tuần), `7_15_21` (Ngày).
+- **Phase 7 result**: BE `GET /api/v1/calendar` endpoint (25 e2e). FE `/lich` page với month/week/day grid, absolute-positioned booking bars, view switcher, KPI row, status legend, filter bar (11 Playwright).
+- **Next phase prep (Phase 8 — Tìm phòng trống nhanh)**: Template `7_15_24`. Endpoint `GET /api/v1/rooms/available?checkIn&checkOut&typeId&areaId&capacity`. FE: trang `/phong-trong`.
+
+### Phase 7 — files (FE)
+
+- `apps/web/src/types/calendar.ts` — CalendarView, CalendarRoom, CalendarBooking, CalendarStats, CalendarResponse, CalendarQuery interfaces
+- `apps/web/src/lib/calendar-utils.ts` — parseDate/formatIso/addDays/startOfMonth/endOfMonth/startOfWeek/endOfWeek/startOfDay/endOfDay/daysBetween/VN_WEEKDAYS/monthLabel/weekLabel/dayLabel (native Date, no date-fns)
+- `apps/web/src/lib/hooks/use-calendar.ts` — CALENDAR_KEYS + useCalendar hook (staleTime 30s)
+- `apps/web/src/app/(dashboard)/lich/page.tsx` — full implementation replacing ComingSoon: month/week grid (GridView) + day view (DayView) + KPI cards + status legend + control bar with view switcher + filter bar; loading/empty/error states
+- `apps/web/tests/lich.spec.ts` — 11 offline Playwright tests
+
+### Phase 7 — files (BE)
+
+- `apps/api/src/calendar/calendar.module.ts`
+- `apps/api/src/calendar/calendar.service.ts` — `getCalendar()`: room query + booking overlap query + occupancy/shift stats
+- `apps/api/src/calendar/calendar.controller.ts` — single `GET /calendar` endpoint, all 4 roles
+- `apps/api/src/calendar/dto/query-calendar.dto.ts` — from/to (ISO8601), view (CalendarView enum), optional typeId/statusId/sourceId/keyword
+- `apps/api/src/calendar/entities/calendar.entity.ts` — CalendarResponse, CalendarResponseEntity.from() static mapper
+- `apps/api/src/app.module.ts` — registered CalendarModule
+- `apps/api/test/calendar.e2e-spec.ts` — 25 tests
 
 ### Phase 6 — files (BE)
 

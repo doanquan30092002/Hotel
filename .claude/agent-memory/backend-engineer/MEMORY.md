@@ -302,6 +302,78 @@ e.checkIn = b.checkIn.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
 Prisma `@db.Date` fields come back as `Date` objects midnight UTC. `.toISOString().slice(0, 10)` gives consistent YYYY-MM-DD format regardless of server timezone.
 
+## Patterns added in Phase 7
+
+### Read-only endpoint with no new model (calendar pattern)
+
+When a feature needs a read-only computed view over existing data (no new DB tables):
+
+1. Create module, service, controller, dto, entity as usual.
+2. No Prisma migration needed — the service queries existing models (`Room`, `Booking`, `BookingItem`).
+3. Controller has a single `@Get()` endpoint returning `{ data: CalendarResponse }`.
+4. The entity file defines both the Prisma input shape (private interfaces) and the public output shape (exported interfaces + a `CalendarResponseEntity` class with a static `from()` mapper).
+
+```ts
+// calendar.service.ts pattern
+const rooms = await this.prisma.room.findMany({
+  where: { deletedAt: null, ...(query.typeId ? { typeId: query.typeId } : {}) },
+  include: { type: { select: {...} }, area: { select: {...} } },
+  orderBy: [{ code: 'asc' }],
+});
+
+const bookings = await this.prisma.booking.findMany({
+  where: {
+    deletedAt: null,
+    checkIn: { lt: to },   // interval-overlap formula reused from Phase 6
+    checkOut: { gt: from },
+    ...(query.statusId ? { statusId: query.statusId } : {}),
+    // keyword → OR[code, customer.fullName, customer.phone, customer.code]
+  },
+  include: {
+    items: { where: { kind: BookingItemKind.ROOM }, include: { room: {...} } },
+  },
+});
+```
+
+### Occupancy percent formula
+
+```
+totalDays = ceil((to - from) / MS_PER_DAY)   // min 1
+totalSlots = rooms.length * totalDays
+
+for each booking b:
+  start = max(from, b.checkIn)
+  end   = min(to, b.checkOut)
+  nights = ceil((end - start) / MS_PER_DAY)   // 0 if no overlap
+  roomCount = b.items.filter(i => i.roomId !== null).length
+  bookedNights += nights * roomCount
+
+  if b.checkIn in [from, to) → shifts++
+  if b.checkOut in (from, to] → shifts++
+
+occupancyPercent = totalSlots > 0 ? round(bookedNights / totalSlots * 100) : 0
+```
+
+### relatedShifts computation
+
+Count of check-in/check-out events that fall within the query range. Useful for the front-end to show activity volume in the calendar.
+
+### CalendarView enum in DTO
+
+```ts
+export enum CalendarView {
+  MONTH = 'month',
+  WEEK = 'week',
+  DAY = 'day',
+}
+```
+
+`view` defaults to `MONTH`. The service passes it through to the response shape; no server-side behaviour changes per view (the FE renders differently based on it).
+
+### Customer seed lookup correction
+
+Always verify actual seed data for e2e tests. KH006 = "Hoàng Gia Linh" (not "Trần Thị Mai"). When writing tests based on seeded data, cross-check `prisma/seed.ts` for exact field values.
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

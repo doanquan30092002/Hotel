@@ -282,6 +282,61 @@ Reset `page = 1` khi: pageSize đổi, keyword đổi (debounce), filter đổi.
 - Date inputs: use `<Input type="date">` with `aria-invalid`. BE expects ISO date string `YYYY-MM-DD` which is exactly what `<input type="date">` produces.
 - Static apply type list for packages: `['Standard', 'VillaVIP', 'Bungalow', 'Family', 'Deluxe']` as `const` — not fetched from BE. Update if BE adds more types.
 
+## Phase 7 patterns (Calendar booking)
+
+### Date helpers (lib/calendar-utils.ts)
+
+- `parseDate(iso)`: split YYYY-MM-DD on `-`, pass to `new Date(y, m-1, d)` — avoids UTC timezone shift from `new Date(isoString)`.
+- `formatIso(d)`: manual `getFullYear/getMonth/getDate` + padStart — same timezone safety.
+- `addDays(d, n)`: clone Date, setDate. `startOfMonth/endOfMonth/startOfWeek/endOfWeek/startOfDay/endOfDay` all return new Date objects.
+- `endOfMonth` returns first day of NEXT month (exclusive), `endOfWeek` returns Monday of next week (exclusive) — use `daysBetween(rangeStart, rangeEnd)` to get the count N.
+- `startOfWeek`: day=0(Sun) → offset=-6, else → offset=1-day. ISO Monday-start week.
+- `daysBetween(from, to)`: `Math.round((to - from) / 86_400_000)`. Works for computing startCol/endCol for booking bars.
+- `VN_WEEKDAYS = ['CN','T2','T3','T4','T5','T6','T7']` — index 0 = Sunday, matches `Date.getDay()`.
+
+### Absolute-positioned booking bars over CSS grid
+
+- Month/week view uses a `<div className="relative flex">` per room row. Day cells are rendered as normal flow divs (width=cellWidth) for background lines and today highlight.
+- Booking bars are `position: absolute` on top, computed via: `startCol = max(0, daysBetween(rangeStart, checkInDate))`, `endCol = min(N, daysBetween(rangeStart, checkOutDate))`. `left = startCol * cellWidth + 1`, `width = (endCol - startCol) * cellWidth - 2`.
+- Cell widths: `MONTH_CELL_W = 48`, `WEEK_CELL_W = 140`. Label inside bar truncates — show full code + customer name only when cellWidth >= 100.
+- `title` attribute on each bar for hover tooltip: `{code} · {customer?.fullName ?? '—'} · {status.name}`.
+- Playwright test: `page.getByTitle(/BK001/).first()` to assert booking bar visible.
+
+### View switcher pattern (3 pill buttons)
+
+- State: `view: CalendarView = 'month'`, `anchorDate: Date = today`.
+- Derive `from`/`to` via `useMemo` on (view, anchorDate): month → startOfMonth..endOfMonth, week → startOfWeek..endOfWeek, day → startOfDay..endOfDay.
+- Navigation `goPrev/goNext`: month → addDays(startOfMonth(d), -1) / addDays(endOfMonth(d), 1); week → addDays(d, ±7); day → addDays(d, ±1).
+- View switcher: `role="group"` div, each button has `aria-pressed={view===v}` and `aria-label="Xem theo Tháng/Tuần/Ngày"`.
+- Active style: `bg-primary text-primary-foreground`, inactive: `bg-background text-muted-foreground hover:bg-muted`.
+
+### Day view
+
+- Time strip is a `relative` container. Grid lines at 0, 6, 12, 18, 24h using `border-l border-dashed` absolute divs at `left: ${h/24*100}%`.
+- Booking block: `leftPct = (startMin / 1440) * 100`, `widthPct = max(2, (durationMin / 1440) * 100)`. Default checkInTime = '14:00', checkOutTime = '12:00'.
+- Empty room: "Trống trong ngày — Nhấp đôi để đặt nhanh hoặc thêm mới".
+
+### Status color map for booking bars
+
+- `pending → bg-amber-400 text-amber-900`
+- `confirmed → bg-sky-400 text-sky-900`
+- `checked_in → bg-emerald-400 text-emerald-900`
+- `checked_out → bg-zinc-300 text-zinc-800`
+- `cancelled → bg-rose-300 text-rose-900`
+
+### Sticky room label column
+
+- `sticky left-0 z-10 bg-card` ensures the room label stays visible when scrolling horizontally.
+- Room label col width: `ROOM_COL_W = 180px`. Set both `width` and `minWidth` in style prop.
+
+### Calendar query key pattern
+
+- `CALENDAR_KEYS = { all: ['calendar'], range: (params) => ['calendar', 'range', params] }`. Same shape as ROOM_KEYS / BOOKING_KEYS.
+
+### KPI test locator gotcha
+
+- Avoid `getByText('2')` — it matches any element with text containing "2" (Tone 2 in theme switcher, month numbers, etc.). Use specific text like `getByText('81%')` or `getByText('Công suất ước tính')` instead.
+
 ## Phase 6 patterns (Bookings)
 
 - `BOOKING_KEYS` follows same shape as other keys: `['bookings']` base, `['bookings','list',params]`, `['bookings','detail',id]`.
