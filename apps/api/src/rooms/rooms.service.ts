@@ -303,10 +303,11 @@ export class RoomsService {
       throw new UnprocessableEntityException('checkOut phải sau checkIn');
     }
 
-    // Get all rooms matching optional filters
+    // Get all rooms matching optional filters; exclude rooms with status='disabled'
     const allRooms = await this.prisma.room.findMany({
       where: {
         deletedAt: null,
+        status: { code: { not: 'disabled' } },
         ...(query.typeId !== undefined ? { typeId: query.typeId } : {}),
         ...(query.capacity !== undefined ? { capacity: { gte: query.capacity } } : {}),
         ...(query.keyword

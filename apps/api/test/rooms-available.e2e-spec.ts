@@ -272,6 +272,36 @@ describe('Rooms Available (e2e)', () => {
     await prisma.booking.delete({ where: { id: createdBooking.id } });
   });
 
+  // ── 10b. Rooms with status=disabled are excluded ─────────────────────────────
+
+  it('Rooms with status=disabled are excluded from /rooms/available', async () => {
+    const disabledStatus = await prisma.category.findUniqueOrThrow({
+      where: { group_code: { group: 'ROOM_STATUS', code: 'disabled' } as never },
+      select: { id: true },
+    });
+    const original = await prisma.room.findUniqueOrThrow({
+      where: { id: roomP102Id },
+      select: { statusId: true },
+    });
+    await prisma.room.update({
+      where: { id: roomP102Id },
+      data: { statusId: disabledStatus.id },
+    });
+    try {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/rooms/available?checkIn=2027-07-01&checkOut=2027-07-03')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      const ids = (res.body.data as Array<{ id: string }>).map((r) => r.id);
+      expect(ids).not.toContain(roomP102Id);
+    } finally {
+      await prisma.room.update({
+        where: { id: roomP102Id },
+        data: { statusId: original.statusId },
+      });
+    }
+  });
+
   // ── 11. meta fields: totalRooms, totalAvailable, totalBooked ─────────────────
 
   it('meta returns correct totalRooms, totalAvailable, totalBooked', async () => {

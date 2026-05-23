@@ -324,10 +324,17 @@ export class BookingsService {
       if (item.kind === BookingItemKind.ROOM && item.roomId) {
         const room = await this.prisma.room.findFirst({
           where: { id: item.roomId, deletedAt: null },
-          select: { id: true },
+          select: {
+            id: true,
+            code: true,
+            status: { select: { code: true } },
+          },
         });
         if (!room) {
           throw new BadRequestException(`roomId '${item.roomId}' không tồn tại`);
+        }
+        if (room.status.code === 'disabled') {
+          throw new ConflictException(`Phòng ${room.code} đã ngưng kinh doanh, không thể đặt`);
         }
       }
       if (item.kind === BookingItemKind.SERVICE && item.serviceId) {

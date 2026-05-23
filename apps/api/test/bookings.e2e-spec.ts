@@ -503,6 +503,46 @@ describe('Bookings (e2e)', () => {
     expect(res.body.message).toMatch(/checkOut/);
   });
 
+  it('POST /bookings — room with status=disabled returns 409 (ngưng kinh doanh)', async () => {
+    // Get the 'disabled' room status id
+    const disabledStatus = await prisma.category.findUniqueOrThrow({
+      where: { group_code: { group: 'ROOM_STATUS', code: 'disabled' } as never },
+      select: { id: true },
+    });
+
+    // Temporarily flip P102's status to disabled
+    const original = await prisma.room.findUniqueOrThrow({
+      where: { id: roomP102Id },
+      select: { statusId: true },
+    });
+    await prisma.room.update({
+      where: { id: roomP102Id },
+      data: { statusId: disabledStatus.id },
+    });
+
+    try {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/bookings')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(
+          buildCreatePayload({
+            checkIn: '2026-11-10',
+            checkOut: '2026-11-12',
+            items: [{ kind: 'ROOM', roomId: roomP102Id, quantity: 2, unitPrice: 850000 }],
+          }),
+        )
+        .expect(409);
+
+      expect(res.body.message).toMatch(/ngưng kinh doanh/i);
+    } finally {
+      // Restore original status
+      await prisma.room.update({
+        where: { id: roomP102Id },
+        data: { statusId: original.statusId },
+      });
+    }
+  });
+
   it('POST /bookings — invalid statusId group returns 400', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/bookings')
