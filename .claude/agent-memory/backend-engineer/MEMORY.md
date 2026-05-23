@@ -615,6 +615,104 @@ const roomLabel = payment.booking.items[0]?.room?.name ?? '—';
 When `ValidationPipe` has `forbidNonWhitelisted: true`, any field not declared in the DTO (like
 an auto-generated `code`) causes a 400. Never include auto-generated fields in create DTOs.
 
+## Patterns added in Phase 11
+
+### Composite `@@unique([staffId, month])` — conflict → 409
+
+When a model has a composite unique index, catch `P2002` from Prisma and translate to a Vietnamese 409 message:
+
+```ts
+try {
+  const payroll = await this.prisma.payroll.create({ data: { ... } });
+  return PayrollEntity.from(payroll);
+} catch (err) {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    throw new ConflictException('Đã có bảng lương của nhân sự này trong tháng');
+  }
+  throw err;
+}
+```
+
+Also apply this catch in `update()` in case client changes `month` or `staffId` to collide.
+
+### Transactional bulk-generate (skip-existing) pattern
+
+```ts
+async generate(dto) {
+  const draftStatusId = await this.getDraftStatusId();
+  const workingDays = dto.workingDays ?? 28;
+  let created = 0; let skipped = 0;
+
+  await this.prisma.$transaction(async (tx) => {
+    const activeStaffs = await tx.staff.findMany({ where: { active: true, deletedAt: null }, select: { id, baseSalary, allowance } });
+    const existingPayrolls = await tx.payroll.findMany({
+      where: { month: dto.month, staffId: { in: activeStaffs.map(s => s.id) }, deletedAt: null },
+      select: { staffId: true },
+    });
+    const existingStaffIds = new Set(existingPayrolls.map(p => p.staffId));
+
+    for (const staff of activeStaffs) {
+      if (existingStaffIds.has(staff.id)) { skipped++; continue; }
+      const code = await this.nextCodeInTx(tx);
+      await tx.payroll.create({ data: { code, month, staffId: staff.id, workingDays, baseSalary, allowance, bonus: 0, penalty: 0, netSalary, statusId: draftStatusId } });
+      created++;
+    }
+  });
+  return { created, skipped };
+}
+```
+
+Key: `nextCodeInTx()` is a tx-client variant of `nextCode()` — pass `tx` instead of `this.prisma` to stay within the transaction.
+
+### paidAt auto-clear-on-flip-away-from-paid pattern
+
+```ts
+const newStatusCode = await this.getStatusCodeById(dto.statusId);
+
+let paidAt: Date | null | undefined;
+if (newStatusCode === 'paid' && !existing.paidAt) {
+  paidAt = new Date(); // Set when flipping TO paid (if not already set)
+} else if (newStatusCode !== 'paid') {
+  paidAt = null; // Clear when flipping AWAY from paid
+}
+// paidAt remains undefined when already paid → not included in update data
+await this.prisma.payroll.update({
+  where: { id },
+  data: { statusId: dto.statusId, ...(paidAt !== undefined ? { paidAt } : {}) },
+});
+```
+
+The `undefined` check ensures idempotency: setting status to 'paid' when it's already 'paid' does not reset `paidAt`.
+
+### netSalary always computed server-side
+
+```ts
+private computeNet(base, allowance, bonus, penalty): Prisma.Decimal {
+  const b = new Prisma.Decimal(base.toString());
+  // ... add/sub
+  return b.add(a).add(bo).sub(p);
+}
+```
+
+- Called on every `create()` and `update()`.
+- `update()` uses merged values: `dto.field ?? Number(existing.field)` before computing.
+- The `netSalary` field is NEVER in any input DTO — `forbidNonWhitelisted: true` blocks it.
+
+### active query param coercion (string → boolean)
+
+In `QueryStaffDto`, use `@Transform` to coerce string `'true'/'false'` to boolean:
+
+```ts
+@Transform(({ value }) => {
+  if (value === 'true' || value === true) return true;
+  if (value === 'false' || value === false) return false;
+  return undefined;
+})
+active?: boolean;
+```
+
+This handles URL query params like `?active=true` which arrive as strings.
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

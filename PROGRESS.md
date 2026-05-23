@@ -2,8 +2,8 @@
 
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
-**Last updated**: 2026-05-23
-**Current phase**: Phase 10 — Finance (Thu chi) BE ✓ (362/362 e2e, lint 0w, typecheck 0e)
+**Last updated**: 2026-05-24
+**Current phase**: Phase 11 — Staff + Payroll BE ✓ (433/433 e2e, lint 0w, typecheck 0e)
 **Active branch**: `master`
 
 ## Phase status
@@ -74,7 +74,7 @@
 - [x] **8. Tìm phòng trống nhanh** (BE complete — 271 e2e total; FE complete — 90/90 Playwright, lint 0w, typecheck 0e)
 - [x] **9. Housekeeping (Dọn phòng)** (BE complete — 312 e2e total, lint 0w, typecheck 0e; FE complete — 101/101 Playwright, lint 0w, typecheck 0e)
 - [x] **10. Finance (Thu chi)** (BE complete — 362 e2e total, lint 0w, typecheck 0e; FE complete — 115/115 Playwright, lint 0w, typecheck 0e)
-- [ ] 11. Staff + Payroll
+- [x] **11. Staff + Payroll** (BE complete — 433 e2e total, lint 0w, typecheck 0e; FE complete — 135/135 Playwright, lint 0w, typecheck 0e)
 - [ ] 12. Uploads (Tệp upload)
 - [ ] 13. Dashboard
 - [ ] 14. Báo cáo & xuất file
@@ -82,10 +82,48 @@
 
 ## Currently working on
 
-- **Status**: Phase 10 (Finance / Thu chi) FE HOÀN TẤT — 115/115 Playwright, lint 0w / typecheck 0e.
+- **Status**: Phase 11 (Staff + Payroll) HOÀN TẤT — BE 433/433 e2e + FE 135/135 Playwright, lint 0w / typecheck 0e.
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 10 FE result**: Types `finance.ts` + hook `use-finance.ts` (7 hooks) + page `/thu-chi` full implementation + `FinanceFormDialog` + 14 Playwright tests.
-- **Next**: Phase 11 — Staff + Payroll.
+- **Phase 11 FE result**: Nhân sự page + Bảng lương page + 20 new Playwright tests (10 nhan-su + 10 luong).
+- **Next**: Phase 12 — Uploads (Tệp upload).
+
+### Phase 11 — files (FE)
+
+- `apps/web/src/types/category.ts` — Added `STAFF_DEPARTMENT`, `STAFF_POSITION`, `PAYROLL_STATUS` to `CategoryGroup` union + `CATEGORY_GROUP_LABEL`
+- `apps/web/src/types/staff.ts` — `ShiftType`, `Staff`, `StaffListQuery`, `CreateStaffInput`, `UpdateStaffInput`
+- `apps/web/src/types/payroll.ts` — `Payroll`, `PayrollListQuery`, `CreatePayrollInput`, `UpdatePayrollInput`, `GeneratePayrollInput`, `GeneratePayrollResult`
+- `apps/web/src/lib/hooks/use-staff.ts` — `STAFF_KEYS` + 5 hooks: `useStaffs`, `useStaff`, `useCreateStaff`, `useUpdateStaff`, `useDeleteStaff`
+- `apps/web/src/lib/hooks/use-payroll.ts` — `PAYROLL_KEYS` + 7 hooks: `usePayrolls`, `usePayroll`, `useCreatePayroll`, `useGeneratePayroll`, `useUpdatePayroll`, `useChangePayrollStatus`, `useDeletePayroll`
+- `apps/web/src/app/(dashboard)/nhan-su/page.tsx` — full implementation (replaced ComingSoon): toolbar (search debounce + dept filter + active filter + add/xlsx btns) + KPI 4 cards (active count / dept count / total salary estimate / 0 next cycle) + table 11 cols (code/avatar+name/dept/position/contact/shift/joinDate/baseSalary/allowance/status/actions) + RBAC gate + loading/empty/error states + always-visible pagination footer
+- `apps/web/src/app/(dashboard)/nhan-su/staff-form-dialog.tsx` — form dialog (create/edit/view): 12 fields (fullName/dept/position/phone/email/shiftType/joinDate/baseSalary/allowance/avatarUrl/active switch/note) + auto-populate from detail for edit/view modes
+- `apps/web/src/app/(dashboard)/luong/page.tsx` — full implementation (replaced ComingSoon): toolbar (search + month picker + status filter + generate/add/xlsx btns) + KPI 4 cards (total count / totalNetSalary / paid sum / pending sum) + table 13 cols (code/month/avatar/staff/dept/workingDays/baseSalary/allowance/bonus/penalty/netSalary/statusFlip/actions) + inline status DropdownMenu + RBAC gate + pagination footer
+- `apps/web/src/app/(dashboard)/luong/payroll-form-dialog.tsx` — form dialog: 10 fields + computed netSalary read-only display + auto-fill baseSalary/allowance from staff selection (useEffect + setValue)
+- `apps/web/src/app/(dashboard)/luong/generate-payroll-dialog.tsx` — small modal: month input + workingDays input + success toast with `created/skipped` counts
+- `apps/web/tests/nhan-su.spec.ts` — 10 offline Playwright tests
+- `apps/web/tests/luong.spec.ts` — 10 offline Playwright tests (total: 135 PASS)
+
+### Phase 11 — files (BE)
+
+- `apps/api/prisma/seed.ts` — `CATEGORY_SEEDS` extended (+12 rows: STAFF_DEPARTMENT x4, STAFF_POSITION x4, PAYROLL_STATUS x3) + `seedStaffs()` (NS001..NS006) + `seedPayrolls()` (BL001..BL006 month=2026-05)
+- `apps/api/src/staff/staff.module.ts`
+- `apps/api/src/staff/staff.service.ts` — `nextCode()` (NS###), `assertCategoryGroup()`, 5 CRUD methods
+- `apps/api/src/staff/staff.controller.ts` — 5 endpoints with Swagger + RBAC (ADMIN/MANAGER only)
+- `apps/api/src/staff/dto/create-staff.dto.ts`
+- `apps/api/src/staff/dto/update-staff.dto.ts`
+- `apps/api/src/staff/dto/query-staff.dto.ts` — active coerced string→boolean via @Transform
+- `apps/api/src/staff/entities/staff.entity.ts`
+- `apps/api/src/payroll/payroll.module.ts`
+- `apps/api/src/payroll/payroll.service.ts` — `nextCode()` (BL###), `nextCodeInTx()` for bulk-generate, `computeNet()` server-side, `getDraftStatusId()`, `getStatusCodeById()`, `assertStaffExists()`, `generate()` transactional skip-existing, `changeStatus()` with auto paidAt flip, 6 CRUD methods
+- `apps/api/src/payroll/payroll.controller.ts` — 7 endpoints (POST /generate before POST /) with Swagger + RBAC
+- `apps/api/src/payroll/dto/create-payroll.dto.ts`
+- `apps/api/src/payroll/dto/update-payroll.dto.ts`
+- `apps/api/src/payroll/dto/query-payroll.dto.ts`
+- `apps/api/src/payroll/dto/change-status.dto.ts`
+- `apps/api/src/payroll/dto/generate-payroll.dto.ts`
+- `apps/api/src/payroll/entities/payroll.entity.ts`
+- `apps/api/src/app.module.ts` — registered StaffModule + PayrollModule
+- `apps/api/test/staff.e2e-spec.ts` — 22 tests
+- `apps/api/test/payroll.e2e-spec.ts` — 30 tests (433 total)
 
 ### Phase 10 — files (BE)
 

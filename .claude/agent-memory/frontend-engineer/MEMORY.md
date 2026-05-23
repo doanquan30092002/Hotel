@@ -557,3 +557,148 @@ Without this ordering, the catch-all swallows summary and booking-payments reque
 
 - `getByText(/BK001/)` matches multiple elements if the code appears in table cells AND booking payment rows → use `getByText(/BK001 – Standard/)` to be specific.
 - `getByText('Tạo phiếu thu chi')` matches both the button text and the dialog heading → use `getByRole('heading', { name: 'Tạo phiếu thu chi' })` for the dialog title assertion.
+
+## Phase 11 patterns (Staff + Payroll)
+
+### Avatar in table cell
+
+```tsx
+<td className="px-3 py-3">
+  <div className="flex items-center gap-2">
+    <Avatar src={s.avatarUrl} name={s.fullName} size={36} />
+    <div className="min-w-0">
+      <p className="font-semibold text-sm truncate">{s.fullName}</p>
+    </div>
+  </div>
+</td>
+```
+
+Small standalone avatar (size=32) in column without name — `<Avatar src={p.staff.avatarUrl} name={p.staff.fullName} size={32} />`.
+
+### Month picker pattern
+
+- Use `<Input type="month" aria-label="Lọc theo tháng" />` for filter bars — produces "YYYY-MM" value naturally.
+- For display: `formatMonth("2026-05")` → `"Tháng 5/2026"` using `parseInt(m, 10)` to strip leading zero.
+- Dialog fields that should lock after creation: `disabled={isView || isEdit}` on both staffId and month selects in PayrollFormDialog.
+
+### Bulk generate dialog with toast result
+
+```tsx
+generateMutation.mutate(
+  { month: data.month, workingDays: data.workingDays },
+  {
+    onSuccess: (result) => {
+      toast({
+        title: `Đã tạo ${result.created} bảng lương, bỏ qua ${result.skipped} bảng lương đã có cho tháng này`,
+        variant: 'success',
+      });
+      onOpenChange(false);
+    },
+  },
+);
+```
+
+Backend returns `{ data: { created: number, skipped: number } }`. `useGeneratePayroll` unwraps to `GeneratePayrollResult`.
+
+### Computed read-only display field (netSalary)
+
+```tsx
+function ComputedNetSalary({ control }: { control: Control<FormData> }) {
+  const baseSalary = useWatch({ control, name: 'baseSalary' }) ?? 0;
+  const allowance = useWatch({ control, name: 'allowance' }) ?? 0;
+  const bonus = useWatch({ control, name: 'bonus' }) ?? 0;
+  const penalty = useWatch({ control, name: 'penalty' }) ?? 0;
+  const net = Number(baseSalary) + Number(allowance) + Number(bonus) - Number(penalty);
+  return (
+    <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm font-semibold text-emerald-700">
+      {formatVnd(net)}
+    </div>
+  );
+}
+```
+
+This is a display-only computed field — BE recomputes netSalary on save anyway. Use `useWatch` from `react-hook-form` (not `watch()`) to avoid re-renders of parent form.
+
+### Inline status flip dropdown on Badge (RBAC-aware)
+
+```tsx
+function StatusFlipButton({ payroll, statuses, canManage }) {
+  const changeMutation = useChangePayrollStatus();
+  if (!canManage) return <PayrollStatusBadge code={payroll.status.code} name={payroll.status.name} />;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="cursor-pointer" aria-label="Đổi trạng thái...">
+          <PayrollStatusBadge code={payroll.status.code} name={payroll.status.name} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {statuses.map((s) => (
+          <DropdownMenuItem
+            key={s.id}
+            disabled={s.id === payroll.status.id || changeMutation.isPending}
+            onClick={() => changeMutation.mutate({ id: payroll.id, statusId: s.id }, ...)}
+          >
+            {s.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+Pattern: render plain Badge for non-managers, DropdownMenu-wrapped for managers. `disabled={s.id === payroll.status.id}` prevents re-selecting the current status.
+
+### Auto-fill salary from staff selection
+
+```tsx
+// In PayrollFormDialog:
+const [selectedStaffId, setSelectedStaffId] = useState('');
+// In staff Select onValueChange:
+field.onChange(v);
+setSelectedStaffId(v);
+// useEffect watching selectedStaffId:
+useEffect(() => {
+  if (!selectedStaffId || mode !== 'create') return;
+  const staff = staffList.find((s) => s.id === selectedStaffId);
+  if (staff) {
+    setValue('baseSalary', parseFloat(staff.baseSalary));
+    setValue('allowance', parseFloat(staff.allowance));
+  }
+}, [selectedStaffId, staffList, setValue, mode]);
+```
+
+Only auto-fill in create mode — edit mode should keep existing values.
+
+### Payroll status badge palette
+
+- `draft` → `bg-zinc-100 text-zinc-700` label "Bản nháp"
+- `pending` → `bg-amber-100 text-amber-700` label "Chờ chi"
+- `paid` → `bg-emerald-100 text-emerald-700` label "Đã chi"
+
+### CategoryGroup additions (Phase 11)
+
+- `STAFF_DEPARTMENT`, `STAFF_POSITION`, `PAYROLL_STATUS` added to `CategoryGroup` union in `apps/web/src/types/category.ts` + `CATEGORY_GROUP_LABEL`.
+- When adding new BE category groups, ALWAYS update the FE `CategoryGroup` type to avoid TypeScript errors in `useCategories({ group: 'NEW_GROUP' })` calls.
+
+### Page-level split with inner content component
+
+To satisfy TypeScript "hooks must not be called conditionally" rule when using permission gate:
+
+```tsx
+export default function PageName() {
+  const { hasRole } = useAuth();
+  const canManage = hasRole('ADMIN', 'MANAGER');
+  if (!canManage) return <PermissionDenied />;
+  return <PageContent canManage={canManage} />;
+}
+
+function PageContent({ canManage }: { canManage: boolean }) {
+  // all hooks go here
+  const [page, setPage] = useState(1);
+  // ...
+}
+```
+
+This avoids the ESLint `react-hooks/rules-of-hooks` error from conditional early return before hooks.

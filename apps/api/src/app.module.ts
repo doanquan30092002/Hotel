@@ -17,6 +17,8 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { HousekeepingModule } from './housekeeping/housekeeping.module';
 import { FinanceModule } from './finance/finance.module';
+import { StaffModule } from './staff/staff.module';
+import { PayrollModule } from './payroll/payroll.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -41,6 +43,8 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     CalendarModule,
     HousekeepingModule,
     FinanceModule,
+    StaffModule,
+    PayrollModule,
   ],
   controllers: [HealthController],
   providers: [

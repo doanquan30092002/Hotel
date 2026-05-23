@@ -73,6 +73,9 @@ enum CategoryGroup {
   UNIT
   SERVICE_GROUP
   SURCHARGE_TYPE
+  STAFF_DEPARTMENT
+  STAFF_POSITION
+  PAYROLL_STATUS
 }
 
 model Category {
@@ -107,6 +110,10 @@ model Category {
 
   financeTxsAsGroup  FinanceTx[] @relation("FinanceTxGroup")
   financeTxsAsMethod FinanceTx[] @relation("FinanceTxMethod")
+
+  staffsAsDepartment Staff[]    @relation("StaffDepartment")
+  staffsAsPosition   Staff[]    @relation("StaffPosition")
+  payrollsAsStatus   Payroll[]  @relation("PayrollStatus")
 
   @@unique([group, code])
   @@index([group, active, sortOrder])
@@ -356,6 +363,61 @@ model FinanceTx {
   @@index([groupId])
   @@index([bookingId])
   @@index([occurredAt])
+  @@index([deletedAt])
+}
+
+model Staff {
+  id           String    @id @default(cuid())
+  code         String    @unique           // NS001..
+  fullName     String
+  departmentId String?
+  department   Category? @relation("StaffDepartment", fields: [departmentId], references: [id])
+  positionId   String?
+  position     Category? @relation("StaffPosition", fields: [positionId], references: [id])
+  phone        String?
+  email        String?
+  shiftType    String    @default("day")   // "day" | "night" | "full"
+  joinDate     DateTime  @db.Date
+  baseSalary   Decimal   @default(0) @db.Decimal(15, 2)
+  allowance    Decimal   @default(0) @db.Decimal(15, 2)
+  active       Boolean   @default(true)
+  avatarUrl    String?
+  note         String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  payrolls Payroll[]
+
+  @@index([departmentId])
+  @@index([positionId])
+  @@index([active])
+  @@index([deletedAt])
+}
+
+model Payroll {
+  id          String    @id @default(cuid())
+  code        String    @unique           // BL001..
+  month       String                      // "YYYY-MM"
+  staffId     String
+  staff       Staff     @relation(fields: [staffId], references: [id])
+  workingDays Int       @default(0)
+  baseSalary  Decimal   @db.Decimal(15, 2)
+  allowance   Decimal   @default(0) @db.Decimal(15, 2)
+  bonus       Decimal   @default(0) @db.Decimal(15, 2)
+  penalty     Decimal   @default(0) @db.Decimal(15, 2)
+  netSalary   Decimal   @db.Decimal(15, 2)
+  statusId    String
+  status      Category  @relation("PayrollStatus", fields: [statusId], references: [id])
+  paidAt      DateTime?
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([staffId, month])
+  @@index([statusId])
+  @@index([month])
   @@index([deletedAt])
 }
 

@@ -216,6 +216,28 @@ const CATEGORY_SEEDS: CategorySeed[] = [
   },
   { group: CategoryGroup.SURCHARGE_TYPE, code: 'weekend', name: 'Phụ thu cuối tuần', sortOrder: 2 },
   { group: CategoryGroup.SURCHARGE_TYPE, code: 'holiday', name: 'Phụ thu lễ', sortOrder: 3 },
+
+  // STAFF_DEPARTMENT
+  { group: CategoryGroup.STAFF_DEPARTMENT, code: 'reception', name: 'Lễ tân', sortOrder: 0 },
+  {
+    group: CategoryGroup.STAFF_DEPARTMENT,
+    code: 'housekeeping',
+    name: 'Buồng phòng',
+    sortOrder: 1,
+  },
+  { group: CategoryGroup.STAFF_DEPARTMENT, code: 'kitchen', name: 'Bếp', sortOrder: 2 },
+  { group: CategoryGroup.STAFF_DEPARTMENT, code: 'management', name: 'Quản lý', sortOrder: 3 },
+
+  // STAFF_POSITION
+  { group: CategoryGroup.STAFF_POSITION, code: 'manager', name: 'Quản lý cơ sở', sortOrder: 0 },
+  { group: CategoryGroup.STAFF_POSITION, code: 'receptionist', name: 'Lễ tân', sortOrder: 1 },
+  { group: CategoryGroup.STAFF_POSITION, code: 'housekeeper', name: 'Buồng phòng', sortOrder: 2 },
+  { group: CategoryGroup.STAFF_POSITION, code: 'cook', name: 'Đầu bếp', sortOrder: 3 },
+
+  // PAYROLL_STATUS
+  { group: CategoryGroup.PAYROLL_STATUS, code: 'draft', name: 'Bản nháp', sortOrder: 0 },
+  { group: CategoryGroup.PAYROLL_STATUS, code: 'pending', name: 'Chờ chi', sortOrder: 1 },
+  { group: CategoryGroup.PAYROLL_STATUS, code: 'paid', name: 'Đã chi', sortOrder: 2 },
 ];
 
 async function seedCategories(): Promise<void> {
@@ -1310,6 +1332,258 @@ async function seedFinanceTxs(): Promise<void> {
   console.log(`Seed finance transactions: ${FINANCE_TX_SEEDS.length} rows upserted`);
 }
 
+interface StaffSeed {
+  code: string;
+  fullName: string;
+  departmentCode: string;
+  positionCode: string;
+  phone: string;
+  joinDate: string;
+  baseSalary: number;
+  allowance: number;
+}
+
+const STAFF_SEEDS: StaffSeed[] = [
+  {
+    code: 'NS001',
+    fullName: 'Nguyễn Hiền An',
+    departmentCode: 'management',
+    positionCode: 'manager',
+    phone: '0900000001',
+    joinDate: '2025-01-15',
+    baseSalary: 12000000,
+    allowance: 1500000,
+  },
+  {
+    code: 'NS002',
+    fullName: 'Lê Thảo My',
+    departmentCode: 'reception',
+    positionCode: 'receptionist',
+    phone: '0900000002',
+    joinDate: '2025-10-01',
+    baseSalary: 8500000,
+    allowance: 800000,
+  },
+  {
+    code: 'NS003',
+    fullName: 'Phạm Quốc Việt',
+    departmentCode: 'housekeeping',
+    positionCode: 'manager',
+    phone: '0900000003',
+    joinDate: '2025-10-25',
+    baseSalary: 8500000,
+    allowance: 800000,
+  },
+  {
+    code: 'NS004',
+    fullName: 'Trần Minh Khoa',
+    departmentCode: 'kitchen',
+    positionCode: 'cook',
+    phone: '0900000004',
+    joinDate: '2025-08-10',
+    baseSalary: 9000000,
+    allowance: 1000000,
+  },
+  {
+    code: 'NS005',
+    fullName: 'Đặng Hoài Thu',
+    departmentCode: 'kitchen',
+    positionCode: 'cook',
+    phone: '0900000005',
+    joinDate: '2025-12-15',
+    baseSalary: 7000000,
+    allowance: 700000,
+  },
+  {
+    code: 'NS006',
+    fullName: 'Bùi Khánh Nam',
+    departmentCode: 'reception',
+    positionCode: 'receptionist',
+    phone: '0900000006',
+    joinDate: '2025-12-22',
+    baseSalary: 6500000,
+    allowance: 600000,
+  },
+];
+
+async function seedStaffs(): Promise<void> {
+  for (const seed of STAFF_SEEDS) {
+    const departmentId = await getCategoryIdByGroupCode(
+      CategoryGroup.STAFF_DEPARTMENT,
+      seed.departmentCode,
+    );
+    const positionId = await getCategoryIdByGroupCode(
+      CategoryGroup.STAFF_POSITION,
+      seed.positionCode,
+    );
+
+    await prisma.staff.upsert({
+      where: { code: seed.code },
+      update: {
+        fullName: seed.fullName,
+        departmentId,
+        positionId,
+        phone: seed.phone,
+        joinDate: new Date(seed.joinDate),
+        baseSalary: new Prisma.Decimal(seed.baseSalary),
+        allowance: new Prisma.Decimal(seed.allowance),
+        active: true,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        fullName: seed.fullName,
+        departmentId,
+        positionId,
+        phone: seed.phone,
+        joinDate: new Date(seed.joinDate),
+        baseSalary: new Prisma.Decimal(seed.baseSalary),
+        allowance: new Prisma.Decimal(seed.allowance),
+        active: true,
+      },
+    });
+  }
+
+  console.log(`Seed staffs: ${STAFF_SEEDS.length} rows upserted`);
+}
+
+interface PayrollSeed {
+  code: string;
+  staffCode: string;
+  month: string;
+  workingDays: number;
+  baseSalary: number;
+  allowance: number;
+  bonus: number;
+  penalty: number;
+  netSalary: number;
+  statusCode: 'draft' | 'pending' | 'paid';
+  paidAt: string | null;
+}
+
+const PAYROLL_SEEDS: PayrollSeed[] = [
+  {
+    code: 'BL001',
+    staffCode: 'NS001',
+    month: '2026-05',
+    workingDays: 28,
+    baseSalary: 12000000,
+    allowance: 1500000,
+    bonus: 3000000,
+    penalty: 0,
+    netSalary: 16500000,
+    statusCode: 'paid',
+    paidAt: '2026-05-31T08:00:00Z',
+  },
+  {
+    code: 'BL002',
+    staffCode: 'NS002',
+    month: '2026-05',
+    workingDays: 28,
+    baseSalary: 8500000,
+    allowance: 800000,
+    bonus: 500000,
+    penalty: 0,
+    netSalary: 9800000,
+    statusCode: 'paid',
+    paidAt: '2026-05-31T08:00:00Z',
+  },
+  {
+    code: 'BL003',
+    staffCode: 'NS003',
+    month: '2026-05',
+    workingDays: 28,
+    baseSalary: 8500000,
+    allowance: 800000,
+    bonus: 900000,
+    penalty: 0,
+    netSalary: 10200000,
+    statusCode: 'pending',
+    paidAt: null,
+  },
+  {
+    code: 'BL004',
+    staffCode: 'NS004',
+    month: '2026-05',
+    workingDays: 28,
+    baseSalary: 9000000,
+    allowance: 1000000,
+    bonus: 800000,
+    penalty: 0,
+    netSalary: 10800000,
+    statusCode: 'pending',
+    paidAt: null,
+  },
+  {
+    code: 'BL005',
+    staffCode: 'NS005',
+    month: '2026-05',
+    workingDays: 28,
+    baseSalary: 7000000,
+    allowance: 700000,
+    bonus: 600000,
+    penalty: 0,
+    netSalary: 8300000,
+    statusCode: 'pending',
+    paidAt: null,
+  },
+  {
+    code: 'BL006',
+    staffCode: 'NS006',
+    month: '2026-05',
+    workingDays: 28,
+    baseSalary: 6500000,
+    allowance: 600000,
+    bonus: 500000,
+    penalty: 0,
+    netSalary: 7600000,
+    statusCode: 'pending',
+    paidAt: null,
+  },
+];
+
+async function seedPayrolls(): Promise<void> {
+  for (const seed of PAYROLL_SEEDS) {
+    const statusId = await getCategoryIdByGroupCode(CategoryGroup.PAYROLL_STATUS, seed.statusCode);
+    const staff = await prisma.staff.findUniqueOrThrow({
+      where: { code: seed.staffCode },
+      select: { id: true },
+    });
+
+    await prisma.payroll.upsert({
+      where: { code: seed.code },
+      update: {
+        staffId: staff.id,
+        month: seed.month,
+        workingDays: seed.workingDays,
+        baseSalary: new Prisma.Decimal(seed.baseSalary),
+        allowance: new Prisma.Decimal(seed.allowance),
+        bonus: new Prisma.Decimal(seed.bonus),
+        penalty: new Prisma.Decimal(seed.penalty),
+        netSalary: new Prisma.Decimal(seed.netSalary),
+        statusId,
+        paidAt: seed.paidAt ? new Date(seed.paidAt) : null,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        staffId: staff.id,
+        month: seed.month,
+        workingDays: seed.workingDays,
+        baseSalary: new Prisma.Decimal(seed.baseSalary),
+        allowance: new Prisma.Decimal(seed.allowance),
+        bonus: new Prisma.Decimal(seed.bonus),
+        penalty: new Prisma.Decimal(seed.penalty),
+        netSalary: new Prisma.Decimal(seed.netSalary),
+        statusId,
+        paidAt: seed.paidAt ? new Date(seed.paidAt) : null,
+      },
+    });
+  }
+
+  console.log(`Seed payrolls: ${PAYROLL_SEEDS.length} rows upserted`);
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -1347,6 +1621,8 @@ async function main() {
   await seedBookings();
   await seedHousekeepingTasks();
   await seedFinanceTxs();
+  await seedStaffs();
+  await seedPayrolls();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }
