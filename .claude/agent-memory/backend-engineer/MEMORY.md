@@ -190,6 +190,118 @@ throws "Request path contains unescaped characters". Always wrap with `encodeURI
 .get(`/api/v1/customers?keyword=${encodeURIComponent('Nguyễn Minh Anh')}`)
 ```
 
+## Patterns added in Phase 6
+
+### Auto-code generator pattern (BK### / KH###)
+
+```ts
+private async nextCode(): Promise<string> {
+  const count = await this.prisma.booking.count({ where: { deletedAt: null } });
+  const candidate = `BK${String(count + 1).padStart(3, '0')}`;
+  const exists = await this.prisma.booking.findUnique({ where: { code: candidate } });
+  if (!exists) return candidate;
+  // Fallback: find max existing code and increment
+  const last = await this.prisma.booking.findFirst({
+    where: { code: { startsWith: 'BK' } },
+    orderBy: { code: 'desc' },
+    select: { code: true },
+  });
+  if (!last) return candidate;
+  const num = parseInt(last.code.replace('BK', ''), 10);
+  return `BK${String(num + 1).padStart(3, '0')}`;
+}
+```
+
+Use the same pattern for any entity that needs sequential human-readable codes (KH### for customers, etc.).
+
+### Anti-overlap room booking check
+
+```ts
+private async assertNoRoomOverlap(
+  roomId: string,
+  checkIn: Date,
+  checkOut: Date,
+  excludeBookingId?: string,
+): Promise<void> {
+  const nonBlockingStatuses = await this.prisma.category.findMany({
+    where: { group: CategoryGroup.BOOKING_STATUS, code: { in: ['cancelled', 'checked_out'] }, deletedAt: null },
+    select: { id: true },
+  });
+  const nonBlockingIds = nonBlockingStatuses.map((s) => s.id);
+
+  const overlap = await this.prisma.booking.findFirst({
+    where: {
+      deletedAt: null,
+      statusId: { notIn: nonBlockingIds },
+      id: excludeBookingId ? { not: excludeBookingId } : undefined,
+      items: { some: { kind: BookingItemKind.ROOM, roomId } },
+      checkIn: { lt: checkOut },
+      checkOut: { gt: checkIn },
+    },
+    select: { code: true },
+  });
+  if (overlap) throw new ConflictException(`Phòng đã được đặt (booking ${overlap.code})`);
+}
+```
+
+- Always pass `excludeBookingId=id` when checking during PATCH to allow updating the same booking.
+- Non-blocking statuses fetched dynamically by code (not hardcoded ID) to survive re-seeding.
+
+### Transactional create-with-nested pattern
+
+```ts
+const booking = await this.prisma.$transaction(async (tx) => {
+  return tx.booking.create({
+    data: {
+      ...topLevelFields,
+      items: { createMany: { data: itemsData } },
+      payments: { createMany: { data: paymentsData } },
+    },
+    include: BOOKING_INCLUDE_DETAIL,
+  });
+});
+```
+
+For update with full replacement of nested collections:
+
+1. `deleteMany` all old items (or `updateMany` with `deletedAt` for soft-delete).
+2. `createMany` new items.
+3. `update` top-level booking fields.
+4. Call `recomputeAndSave(bookingId, tx)` to recalculate totals from DB.
+5. After transaction, call `findOne(id)` to get fresh data with all includes.
+
+### `recomputeAndSave` pattern (recalc totals after mutation)
+
+```ts
+private async recomputeAndSave(bookingId: string, tx: Prisma.TransactionClient): Promise<void> {
+  const items = await tx.bookingItem.findMany({ where: { bookingId }, select: { kind: true, amount: true } });
+  const payments = await tx.payment.findMany({ where: { bookingId, deletedAt: null }, select: { amount: true } });
+  let total = new Prisma.Decimal(0);
+  for (const item of items) {
+    total = item.kind === 'DISCOUNT' ? total.sub(item.amount) : total.add(item.amount);
+  }
+  if (total.lessThan(0)) total = new Prisma.Decimal(0);
+  let paid = payments.reduce((acc, p) => acc.add(p.amount), new Prisma.Decimal(0));
+  const remaining = total.sub(paid).lessThan(0) ? new Prisma.Decimal(0) : total.sub(paid);
+  await tx.booking.update({ where: { id: bookingId }, data: { totalAmount: total, paidAmount: paid, remainingAmount: remaining } });
+}
+```
+
+Call this at the end of any transaction that mutates items or payments.
+
+### resolveCustomer pattern (auto-create / match existing)
+
+Priority: `customerId` (explicit link) > phone match > idNumber match > auto-create new customer with `nextCustomerCode()`. Returns `null` if no customer info at all.
+
+### Date serialization for @db.Date fields
+
+```ts
+// In entity.fromList():
+e.checkIn = b.checkIn.toISOString().slice(0, 10); // "YYYY-MM-DD"
+```
+
+Prisma `@db.Date` fields come back as `Date` objects midnight UTC. `.toISOString().slice(0, 10)` gives consistent YYYY-MM-DD format regardless of server timezone.
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

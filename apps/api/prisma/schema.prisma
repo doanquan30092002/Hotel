@@ -95,6 +95,12 @@ model Category {
   servicesAsGroup Service[] @relation("ServiceGroup")
   servicesAsUnit  Service[] @relation("ServiceUnit")
 
+  bookingsAsSource    Booking[]     @relation("BookingSource")
+  bookingsAsStatus    Booking[]     @relation("BookingStatus")
+  bookingsAsPriceType Booking[]     @relation("BookingPriceType")
+  bookingItemsAsSurchargeType BookingItem[] @relation("BookingItemSurchargeType")
+  paymentsAsMethod    Payment[]     @relation("PaymentMethod")
+
   @@unique([group, code])
   @@index([group, active, sortOrder])
 }
@@ -123,6 +129,8 @@ model Room {
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
 
+  bookingItems BookingItem[]
+
   @@index([typeId])
   @@index([statusId])
   @@index([deletedAt])
@@ -145,6 +153,8 @@ model Customer {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
+  bookings Booking[]
+
   @@index([sourceId])
   @@index([deletedAt])
   @@index([fullName])
@@ -164,6 +174,8 @@ model Service {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  bookingItems BookingItem[]
 
   @@index([groupId])
   @@index([deletedAt])
@@ -185,8 +197,95 @@ model PricePackage {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
+  bookings Booking[]
+
   @@index([deletedAt])
   @@index([validFrom, validTo])
+}
+
+enum BookingItemKind {
+  ROOM
+  SERVICE
+  SURCHARGE
+  DISCOUNT
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  sourceId        String?
+  source          Category?     @relation("BookingSource", fields: [sourceId], references: [id])
+  statusId        String
+  status          Category      @relation("BookingStatus", fields: [statusId], references: [id])
+  priceTypeId     String?
+  priceType       Category?     @relation("BookingPriceType", fields: [priceTypeId], references: [id])
+  packageId       String?
+  package         PricePackage? @relation(fields: [packageId], references: [id])
+  checkIn         DateTime      @db.Date
+  checkOut        DateTime      @db.Date
+  checkInTime     String?
+  checkOutTime    String?
+  adults          Int           @default(1)
+  children        Int           @default(0)
+  numRooms        Int           @default(1)
+  totalAmount     Decimal       @default(0) @db.Decimal(15, 2)
+  paidAmount      Decimal       @default(0) @db.Decimal(15, 2)
+  remainingAmount Decimal       @default(0) @db.Decimal(15, 2)
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  items    BookingItem[]
+  payments Payment[]
+
+  @@index([statusId])
+  @@index([customerId])
+  @@index([checkIn, checkOut])
+  @@index([deletedAt])
+}
+
+model BookingItem {
+  id              String          @id @default(cuid())
+  bookingId       String
+  booking         Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  kind            BookingItemKind
+  roomId          String?
+  room            Room?           @relation(fields: [roomId], references: [id])
+  serviceId       String?
+  service         Service?        @relation(fields: [serviceId], references: [id])
+  surchargeTypeId String?
+  surchargeType   Category?       @relation("BookingItemSurchargeType", fields: [surchargeTypeId], references: [id])
+  refCode         String?
+  refName         String?
+  quantity        Decimal         @default(1) @db.Decimal(10, 2)
+  unitPrice       Decimal         @db.Decimal(15, 2)
+  amount          Decimal         @db.Decimal(15, 2)
+  note            String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([bookingId])
+  @@index([roomId])
+}
+
+model Payment {
+  id        String    @id @default(cuid())
+  bookingId String
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  methodId  String
+  method    Category  @relation("PaymentMethod", fields: [methodId], references: [id])
+  amount    Decimal   @db.Decimal(15, 2)
+  paidAt    DateTime  @default(now())
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([bookingId])
+  @@index([deletedAt])
 }
 
 model AuditLog {

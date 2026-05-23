@@ -9,7 +9,7 @@ for (const candidate of [resolve(__dirname, '../../../.env'), resolve(__dirname,
   }
 }
 
-import { CategoryGroup, Prisma, PrismaClient, UserRole } from '@prisma/client';
+import { BookingItemKind, CategoryGroup, Prisma, PrismaClient, UserRole } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
@@ -719,6 +719,282 @@ async function seedPricePackages(): Promise<void> {
   console.log(`Seed price packages: ${PRICE_PACKAGE_SEEDS.length} rows upserted`);
 }
 
+async function seedBookings(): Promise<void> {
+  // Resolve category IDs
+  const statusCheckedIn = await getCategoryIdByGroupCode(
+    CategoryGroup.BOOKING_STATUS,
+    'checked_in',
+  );
+  const statusConfirmed = await getCategoryIdByGroupCode(CategoryGroup.BOOKING_STATUS, 'confirmed');
+  const statusPending = await getCategoryIdByGroupCode(CategoryGroup.BOOKING_STATUS, 'pending');
+  const sourceWalkin = await getCategoryIdByGroupCode(CategoryGroup.BOOKING_SOURCE, 'walkin');
+  const sourceBookingDotCom = await getCategoryIdByGroupCode(
+    CategoryGroup.BOOKING_SOURCE,
+    'bookingdotcom',
+  );
+  const sourceAgoda = await getCategoryIdByGroupCode(CategoryGroup.BOOKING_SOURCE, 'agoda');
+  const pricePerNight = await getCategoryIdByGroupCode(CategoryGroup.PRICE_TYPE, 'per_night');
+  const methodCash = await getCategoryIdByGroupCode(CategoryGroup.PAYMENT_METHOD, 'cash');
+  const methodBankTransfer = await getCategoryIdByGroupCode(
+    CategoryGroup.PAYMENT_METHOD,
+    'bank_transfer',
+  );
+
+  // Resolve entity IDs
+  const customerKH006 = await prisma.customer.findUniqueOrThrow({
+    where: { code: 'KH006' },
+    select: { id: true },
+  });
+  const customerKH001 = await prisma.customer.findUniqueOrThrow({
+    where: { code: 'KH001' },
+    select: { id: true },
+  });
+  const customerKH003 = await prisma.customer.findUniqueOrThrow({
+    where: { code: 'KH003' },
+    select: { id: true },
+  });
+
+  const roomP101 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'P101' },
+    select: { id: true },
+  });
+  const roomV101 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'V101' },
+    select: { id: true },
+  });
+  const roomP301 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'P301' },
+    select: { id: true },
+  });
+
+  const serviceBreakfast = await prisma.service.findUniqueOrThrow({
+    where: { code: 'DV001' },
+    select: { id: true },
+  });
+  const serviceBBQ = await prisma.service.findUniqueOrThrow({
+    where: { code: 'DV004' },
+    select: { id: true },
+  });
+
+  // ── BK001 — Checked In ──────────────────────────────────────────────────────
+  const bk001Total = new Prisma.Decimal(1700000).add(new Prisma.Decimal(160000)); // 1,860,000
+  const bk001Paid = new Prisma.Decimal(1500000);
+  const bk001Remaining = bk001Total.sub(bk001Paid); // 360,000
+
+  const bk001 = await prisma.booking.upsert({
+    where: { code: 'BK001' },
+    update: {
+      customerId: customerKH006.id,
+      sourceId: sourceWalkin,
+      statusId: statusCheckedIn,
+      priceTypeId: pricePerNight,
+      checkIn: new Date('2026-05-20'),
+      checkOut: new Date('2026-05-22'),
+      adults: 2,
+      children: 0,
+      numRooms: 1,
+      totalAmount: bk001Total,
+      paidAmount: bk001Paid,
+      remainingAmount: bk001Remaining,
+      deletedAt: null,
+    },
+    create: {
+      code: 'BK001',
+      customerId: customerKH006.id,
+      sourceId: sourceWalkin,
+      statusId: statusCheckedIn,
+      priceTypeId: pricePerNight,
+      checkIn: new Date('2026-05-20'),
+      checkOut: new Date('2026-05-22'),
+      adults: 2,
+      children: 0,
+      numRooms: 1,
+      totalAmount: bk001Total,
+      paidAmount: bk001Paid,
+      remainingAmount: bk001Remaining,
+    },
+  });
+
+  // Upsert items for BK001 — delete existing and recreate (idempotent pattern)
+  await prisma.bookingItem.deleteMany({ where: { bookingId: bk001.id } });
+  await prisma.bookingItem.createMany({
+    data: [
+      {
+        bookingId: bk001.id,
+        kind: BookingItemKind.ROOM,
+        roomId: roomP101.id,
+        refCode: 'P101',
+        refName: 'Phòng 101 – Standard',
+        quantity: new Prisma.Decimal(2),
+        unitPrice: new Prisma.Decimal(850000),
+        amount: new Prisma.Decimal(1700000),
+      },
+      {
+        bookingId: bk001.id,
+        kind: BookingItemKind.SERVICE,
+        serviceId: serviceBreakfast.id,
+        refCode: 'DV001',
+        refName: 'Ăn sáng',
+        quantity: new Prisma.Decimal(2),
+        unitPrice: new Prisma.Decimal(80000),
+        amount: new Prisma.Decimal(160000),
+      },
+    ],
+  });
+
+  // Upsert payments for BK001
+  await prisma.payment.deleteMany({ where: { bookingId: bk001.id } });
+  await prisma.payment.create({
+    data: {
+      bookingId: bk001.id,
+      methodId: methodCash,
+      amount: new Prisma.Decimal(1500000),
+      paidAt: new Date('2026-05-20T14:30:00Z'),
+    },
+  });
+
+  // ── BK002 — Confirmed ───────────────────────────────────────────────────────
+  // Room 3 nights + BBQ 3 + discount 500,000
+  const bk002RoomAmt = new Prisma.Decimal(2500000).mul(3); // 7,500,000
+  const bk002SvcAmt = new Prisma.Decimal(450000).mul(3); // 1,350,000
+  const bk002Discount = new Prisma.Decimal(500000);
+  const bk002Total = bk002RoomAmt.add(bk002SvcAmt).sub(bk002Discount); // 8,350,000
+  const bk002Paid = new Prisma.Decimal(4000000);
+  const bk002Remaining = bk002Total.sub(bk002Paid);
+
+  const bk002 = await prisma.booking.upsert({
+    where: { code: 'BK002' },
+    update: {
+      customerId: customerKH001.id,
+      sourceId: sourceBookingDotCom,
+      statusId: statusConfirmed,
+      priceTypeId: pricePerNight,
+      checkIn: new Date('2026-06-05'),
+      checkOut: new Date('2026-06-08'),
+      adults: 2,
+      children: 0,
+      numRooms: 1,
+      totalAmount: bk002Total,
+      paidAmount: bk002Paid,
+      remainingAmount: bk002Remaining,
+      deletedAt: null,
+    },
+    create: {
+      code: 'BK002',
+      customerId: customerKH001.id,
+      sourceId: sourceBookingDotCom,
+      statusId: statusConfirmed,
+      priceTypeId: pricePerNight,
+      checkIn: new Date('2026-06-05'),
+      checkOut: new Date('2026-06-08'),
+      adults: 2,
+      children: 0,
+      numRooms: 1,
+      totalAmount: bk002Total,
+      paidAmount: bk002Paid,
+      remainingAmount: bk002Remaining,
+    },
+  });
+
+  await prisma.bookingItem.deleteMany({ where: { bookingId: bk002.id } });
+  await prisma.bookingItem.createMany({
+    data: [
+      {
+        bookingId: bk002.id,
+        kind: BookingItemKind.ROOM,
+        roomId: roomV101.id,
+        refCode: 'V101',
+        refName: 'Villa VIP 101',
+        quantity: new Prisma.Decimal(3),
+        unitPrice: new Prisma.Decimal(2500000),
+        amount: bk002RoomAmt,
+      },
+      {
+        bookingId: bk002.id,
+        kind: BookingItemKind.SERVICE,
+        serviceId: serviceBBQ.id,
+        refCode: 'DV004',
+        refName: 'BBQ tối',
+        quantity: new Prisma.Decimal(3),
+        unitPrice: new Prisma.Decimal(450000),
+        amount: bk002SvcAmt,
+      },
+      {
+        bookingId: bk002.id,
+        kind: BookingItemKind.DISCOUNT,
+        refName: 'Giảm giá khuyến mãi',
+        quantity: new Prisma.Decimal(1),
+        unitPrice: new Prisma.Decimal(500000),
+        amount: bk002Discount,
+      },
+    ],
+  });
+
+  await prisma.payment.deleteMany({ where: { bookingId: bk002.id } });
+  await prisma.payment.create({
+    data: {
+      bookingId: bk002.id,
+      methodId: methodBankTransfer,
+      amount: new Prisma.Decimal(4000000),
+      paidAt: new Date('2026-06-01T10:00:00Z'),
+    },
+  });
+
+  // ── BK003 — Pending ─────────────────────────────────────────────────────────
+  const bk003RoomAmt = new Prisma.Decimal(1200000).mul(2); // 2,400,000
+  const bk003Total = bk003RoomAmt;
+
+  const bk003 = await prisma.booking.upsert({
+    where: { code: 'BK003' },
+    update: {
+      customerId: customerKH003.id,
+      sourceId: sourceAgoda,
+      statusId: statusPending,
+      priceTypeId: pricePerNight,
+      checkIn: new Date('2026-07-01'),
+      checkOut: new Date('2026-07-03'),
+      adults: 3,
+      children: 1,
+      numRooms: 1,
+      totalAmount: bk003Total,
+      paidAmount: new Prisma.Decimal(0),
+      remainingAmount: bk003Total,
+      deletedAt: null,
+    },
+    create: {
+      code: 'BK003',
+      customerId: customerKH003.id,
+      sourceId: sourceAgoda,
+      statusId: statusPending,
+      priceTypeId: pricePerNight,
+      checkIn: new Date('2026-07-01'),
+      checkOut: new Date('2026-07-03'),
+      adults: 3,
+      children: 1,
+      numRooms: 1,
+      totalAmount: bk003Total,
+      paidAmount: new Prisma.Decimal(0),
+      remainingAmount: bk003Total,
+    },
+  });
+
+  await prisma.bookingItem.deleteMany({ where: { bookingId: bk003.id } });
+  await prisma.bookingItem.create({
+    data: {
+      bookingId: bk003.id,
+      kind: BookingItemKind.ROOM,
+      roomId: roomP301.id,
+      refCode: 'P301',
+      refName: 'Phòng 301 – Family',
+      quantity: new Prisma.Decimal(2),
+      unitPrice: new Prisma.Decimal(1200000),
+      amount: bk003RoomAmt,
+    },
+  });
+
+  console.log('Seed bookings: 3 rows upserted (BK001, BK002, BK003)');
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -753,6 +1029,7 @@ async function main() {
   await seedCustomers();
   await seedServices();
   await seedPricePackages();
+  await seedBookings();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }

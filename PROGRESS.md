@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-23
-**Current phase**: Phase 5 — Services + Price Packages ✓ (review + test gate PASS — 191/191 e2e + 54/54 Playwright)
+**Current phase**: Phase 6 — Bookings ✓ (review + test gate PASS — 233/233 e2e + 69/69 Playwright)
 **Active branch**: `master`
 
 ## Phase status
@@ -60,7 +60,15 @@
   - [x] Tester gate: 191/191 e2e PASS (9 suites: health/auth/users/settings/categories/rooms/customers/services/packages — 76 mới: 36 services + 40 packages) + 54/54 Playwright PASS (27 mới: 13 dich-vu + 14 goi-mau).
   - [x] Code-reviewer gate: PASS (0 Critical, 1 Major non-blocking — pre-existing CRLF/prettier issue, fixed bằng `endOfLine: "auto"` + `.gitattributes` mới, 7 nit).
   - [x] Infra fix: `.prettierrc` → `endOfLine: "auto"` (cross-platform) + thêm `.gitattributes` (`* text=auto eol=lf`, `*.{cmd,bat,ps1} eol=crlf`, image binaries) để chuẩn hóa line endings cho repo.
-- [ ] 6. Bookings (CORE)
+- [x] **6. Bookings (CORE)**
+  - [x] BE: `Booking` + `BookingItem` (polymorphic kind: ROOM/SERVICE/SURCHARGE/DISCOUNT) + `Payment` models + `BookingItemKind` enum + migration `06_bookings` + 6 inverse relations (Category x5, Customer, PricePackage, Room, Service) + seed 3 demo bookings (BK001 checked_in, BK002 confirmed w/discount, BK003 pending).
+  - [x] BE: 10 endpoints `/api/v1/bookings` — list (filter statusId/sourceId/customerId/roomId/from/to/keyword + pagination), get detail, create (auto-resolve customer, anti-overlap, computeTotals), update (item/payment collection replacement), change-status, soft delete, add-payment, delete-payment (soft), check-in, check-out. RBAC: GET all, write = ADMIN/MANAGER/RECEPTIONIST, delete = ADMIN/MANAGER.
+  - [x] BE: Anti-overlap pattern via interval-overlap formula `(existing.checkIn < newCheckOut) AND (existing.checkOut > newCheckIn)` with non-blocking status (cancelled/checked_out) dynamic lookup + `excludeBookingId` for PATCH. Auto-code `BK###`/`KH###` with collision fallback (count → findFirst desc). `resolveCustomer()` priority: customerId > phone match > idNumber match > auto-create.
+  - [x] FE: types `booking.ts` + hooks `use-bookings.ts` (`BOOKING_KEYS` + 10 hooks).
+  - [x] FE: `/booking` list — toolbar (search debounced + status filter + source filter + Tạo booking) + table (10 cols match `7_15_27`: Mã/Khách/Ngày/Phòng+N/Loại giá/Tổng/Đã TT/Còn lại/Trạng thái/Thao tác) + status badge palette (pending=amber, confirmed=sky, checked_in=emerald, checked_out=zinc, cancelled=rose) + inline check-in/check-out icons (kind-conditional on status.code) + pagination footer always visible + RBAC (HOUSEKEEPING read-only, RECEPTIONIST no delete) + states.
+  - [x] FE: `BookingFormDialog` (max-w-5xl) — 4 sections theo `7_15_50`: Thông tin booking (status/priceType/source/package + check-in/out date+time + adults/children/numRooms/note) + Khách hàng (existing combobox auto-fill, manual fallback) + Chi tiết linh hoạt (4 chip buttons add row, `useFieldArray` table với kind-conditional Select column, auto-fill room/service unit price) + Thanh toán nhiều đợt (`useFieldArray` payments) + computed live totals footer. Mode=create|edit|view.
+  - [x] Tester gate: 233/233 e2e PASS (10 suites: health/auth/users/settings/categories/rooms/customers/services/packages/bookings — 42 mới) + 69/69 Playwright PASS (15 mới: booking). lint 0w / typecheck 0e cả 2 workspace.
+  - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 0 nit — self-review do subagent hit rate limit; verified anti-overlap, totals computation, customer resolver priority, RBAC split, pagination MANDATORY, status palette).
 - [ ] 7. Calendar booking
 - [ ] 8. Tìm phòng trống nhanh
 - [ ] 9. Housekeeping
@@ -73,11 +81,30 @@
 
 ## Currently working on
 
-- **Status**: Phase 5 (Services + Price Packages) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 6 (Bookings — CORE).
-- **Branch policy đổi**: User chỉ định merge tất cả nhánh `feat/01..04` vào `master` và làm trực tiếp trên `master` từ Phase 5 trở đi (fast-forward, không qua PR). `feat/05-services-packages` rỗng đã xóa.
-- **Phase 5 result**: BE 191/191 e2e PASS (9 suites — 76 mới), FE 54/54 Playwright PASS (27 mới), lint 0w/typecheck 0e cả 2 workspace. Code-review PASS với 0 Critical / 1 Major đã fix / 7 nit.
-- **Infra fix Phase 5**: `.prettierrc` `endOfLine: "lf"` → `"auto"` để không vướng CRLF trên Windows + thêm `.gitattributes` chuẩn hóa line endings cho check-out tương lai.
-- **Next phase prep (Phase 6 — Bookings CORE)**: Đây là module lõi nhất. Cần 3 model `Booking` (code, customerId, sourceId, statusId, priceTypeId, checkIn/Out, adults/children, total/paid/remaining), `BookingItem` (polymorphic theo `kind`: room|service|surcharge|discount), `Payment` (bookingId, methodId, amount, paidAt). Tính total/paid/remaining trên service layer. Anti-overlap check khi book cùng phòng. Auto-create customer khi POST booking với phone mới. Template chính: `7_15_45` (list), `7_15_50` (modal tạo booking đa dòng), `7_15_56` (chi tiết).
+- **Status**: Phase 6 (Bookings CORE) hoàn tất. Cả 2 gate PASS. Sẵn sàng chuyển sang Phase 7 (Calendar booking).
+- **Branch policy**: Làm trực tiếp trên `master`.
+- **Phase 6 result**: BE 233/233 e2e (10 suites — 42 mới), FE 69/69 Playwright (15 mới), lint 0w / typecheck 0e cả 2 workspace. Self-review PASS với 0 Critical / 0 Major / 0 nit.
+- **Next phase prep (Phase 7 — Calendar booking)**: Endpoint `GET /api/v1/calendar?from&to&view&typeId&statusId&sourceId&keyword` trả về bookings + rooms + chiếm dụng/ô lưới theo view (month/week/day). FE: trang `/lich` với view switcher 3 mode + filter bar + grid render. Template chính: `7_15_15` (Tháng), `7_15_18` (Tuần), `7_15_21` (Ngày).
+
+### Phase 6 — files (BE)
+
+- `apps/api/prisma/schema.prisma` — Booking + BookingItem + Payment models + BookingItemKind enum + inverse relations on Category/Customer/Room/Service/PricePackage
+- `apps/api/prisma/migrations/20260523053920_06_bookings/migration.sql`
+- `apps/api/prisma/seed.ts` — `seedBookings()` with BK001/BK002/BK003
+- `apps/api/src/bookings/bookings.module.ts`
+- `apps/api/src/bookings/bookings.service.ts` — nextCode(), nextCustomerCode(), computeTotals(), assertNoRoomOverlap(), resolveCustomer(), recomputeAndSave() + 10 endpoints
+- `apps/api/src/bookings/bookings.controller.ts` — 10 endpoints with Swagger + RBAC
+- `apps/api/src/bookings/dto/booking-item.dto.ts`
+- `apps/api/src/bookings/dto/booking-payment.dto.ts`
+- `apps/api/src/bookings/dto/create-booking.dto.ts` — CreateBookingCustomerDto + CreateBookingDto
+- `apps/api/src/bookings/dto/update-booking.dto.ts`
+- `apps/api/src/bookings/dto/query-booking.dto.ts`
+- `apps/api/src/bookings/dto/change-status.dto.ts`
+- `apps/api/src/bookings/dto/create-payment.dto.ts`
+- `apps/api/src/bookings/dto/check-in-out.dto.ts`
+- `apps/api/src/bookings/entities/booking.entity.ts` — BookingItemEntity + PaymentEntity + BookingEntity (fromList/fromDetail)
+- `apps/api/src/app.module.ts` — registered BookingsModule
+- `apps/api/test/bookings.e2e-spec.ts` — 42 tests
 
 ### Phase 4 — files (BE)
 
@@ -285,6 +312,14 @@
 - 2026-05-21: Phase 3 — Status/Cleaning flip dùng endpoint riêng (`PATCH /rooms/:id/status`, `PATCH /rooms/:id/cleaning`) thay vì PATCH general, để RBAC cho phép RECEPTIONIST đổi status và HOUSEKEEPING đổi cleaning mà không mở quyền edit toàn bộ Room.
 - 2026-05-21: Phase 3 — Inline status/cleaning UX: click badge → DropdownMenu các option của group → mutation. Badge không có quyền render plain (no cursor-pointer).
 - 2026-05-21: Phase 3 — Zustand-persist hydration race trong `(dashboard)/layout.tsx`: thêm `hydrated` flag + 2-stage useEffect. Pattern này áp dụng cho mọi protected layout sau này.
+
+- 2026-05-23: Phase 6 — Booking anti-overlap query uses `items: { some: { kind: ROOM, roomId } }` + `checkIn: { lt: newCheckOut }` + `checkOut: { gt: newCheckIn }`. Non-blocking statuses (cancelled, checked_out) fetched dynamically by code to avoid hardcoding IDs.
+- 2026-05-23: Phase 6 — `update()` no longer returns `tx.booking.update()` result inline; instead calls `findOne()` after transaction commit to guarantee fresh data with all includes.
+- 2026-05-23: Phase 6 — `nextCode()` pattern: count active rows + 1 → check uniqueness → fallback to `findFirst(orderBy code desc)` to handle gaps from soft-deletes. Same for `nextCustomerCode()`.
+- 2026-05-23: Phase 6 — `resolveCustomer()` priority: explicit `customerId` > phone match > idNumber match > auto-create with auto-code. Returns `null` if no customer info provided.
+- 2026-05-23: Phase 6 — Payment soft-delete: `deletedAt` on Payment. `_count.payments` and list filter both filter `deletedAt: null`. `recomputeAndSave()` recalculates from DB items (BookingItem hard-deleted on update) + live payments.
+- 2026-05-23: Phase 6 — BookingItem is hard-deleted when booking is updated with new items array (replace semantics). Payment is soft-deleted when booking is updated with new payments array.
+- 2026-05-23: Phase 6 — `BOOKING_INCLUDE_DETAIL._count.payments` uses `{ where: { deletedAt: null } }` to count only active payments. `paymentCount` in entity reflects this.
 
 ## Notes for next session
 

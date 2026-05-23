@@ -281,3 +281,21 @@ Reset `page = 1` khi: pageSize đổi, keyword đổi (debounce), filter đổi.
 - `Switch` component imported from `@/components/ui/switch` — available since Phase 2. Used for active/inactive toggle in form dialogs.
 - Date inputs: use `<Input type="date">` with `aria-invalid`. BE expects ISO date string `YYYY-MM-DD` which is exactly what `<input type="date">` produces.
 - Static apply type list for packages: `['Standard', 'VillaVIP', 'Bungalow', 'Family', 'Deluxe']` as `const` — not fetched from BE. Update if BE adds more types.
+
+## Phase 6 patterns (Bookings)
+
+- `BOOKING_KEYS` follows same shape as other keys: `['bookings']` base, `['bookings','list',params]`, `['bookings','detail',id]`.
+- RBAC for bookings: `canAdd/canEdit = hasRole('ADMIN','MANAGER','RECEPTIONIST')`, `canDelete = hasRole('ADMIN','MANAGER')`. HOUSEKEEPING sees list read-only, no Add/Edit/Delete.
+- Big dialog pattern: `DialogContent` with `max-w-5xl max-h-[92vh] overflow-y-auto` for forms with many fields. Use `SectionHeader` component with `bg-muted rounded-lg` bar to visually separate sections.
+- `useFieldArray` for nested items table: `const { fields, append, remove } = useFieldArray({ control, name: 'items' })`. Use `watch('items.N.kind')` to conditionally render different select types per row (ROOM → room select, SERVICE → service select, SURCHARGE → surcharge type select, DISCOUNT → free text).
+- Auto-fill pattern: when Select `onValueChange` fires for a room/service pick, call `setValue('items.N.refCode', ...)` + `setValue('items.N.unitPrice', ...)` to populate dependent fields automatically.
+- Auto-fill customer: `useEffect` watching `customerId` from form → find customer in loaded list → `setValue` for fullName/phone/idNumber/email/address. Customer fields become `disabled={isExistingCustomer}`.
+- Computed totals live: `watch('items')` and `watch('payments')` → reduce to get totalAmount + paidAmount → remaining = total - paid. DISCOUNT items subtract: `amount = -(qty * price)`.
+- `useMemo` required for arrays derived from query data when used in `useEffect` deps: `const customers = useMemo(() => data?.data ?? [], [data])` — avoids react-hooks/exhaustive-deps warning.
+- Kind badge: `ROOM → sky`, `SERVICE → emerald`, `SURCHARGE → amber`, `DISCOUNT → rose` — consistent with booking status palette.
+- Booking status badge class map: `pending → amber`, `confirmed → sky`, `checked_in → emerald`, `checked_out → zinc`, `cancelled → rose`. Key is `status.code` (not name).
+- Inline check-in/check-out buttons: only show `LogIn` icon when `status.code === 'confirmed'`, only show `LogOut` when `status.code === 'checked_in'`. Both behind `canEdit` RBAC gate.
+- Mode prop pattern for shared form dialog: `mode: 'create' | 'edit' | 'view'`. In view mode all inputs are `disabled`, footer shows only "Đóng" button. Edit mode pre-fetches detail via `useBooking(id)` with `staleTime: 0`.
+- `todayIso()` / `tomorrowIso()` helpers in dialog file: compute date strings client-side with `new Date()` avoiding SSR concerns (dialog is always client-rendered).
+- Items table for DISCOUNT rows: refName field is writable (user types description), not auto-filled from a select — use same `<Input>` for both the "ref selector" column and the refName column but hide the duplicate.
+- `items` table `kind` column uses `watch('items.${index}.kind')` to react to form state — ensures live badge update when kind changes.
