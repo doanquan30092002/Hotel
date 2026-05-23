@@ -36,8 +36,9 @@ model User {
   updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
 
-  auditLogs                  AuditLog[]
+  auditLogs                   AuditLog[]
   housekeepingTasksAsAssignee HousekeepingTask[] @relation("HousekeepingAssignee")
+  financeTxsCreated           FinanceTx[]        @relation("FinanceTxCreatedBy")
 
   @@index([role, status])
 }
@@ -103,6 +104,9 @@ model Category {
   paymentsAsMethod    Payment[]     @relation("PaymentMethod")
 
   housekeepingTasksAsStatus HousekeepingTask[] @relation("HousekeepingStatus")
+
+  financeTxsAsGroup  FinanceTx[] @relation("FinanceTxGroup")
+  financeTxsAsMethod FinanceTx[] @relation("FinanceTxMethod")
 
   @@unique([group, code])
   @@index([group, active, sortOrder])
@@ -245,6 +249,7 @@ model Booking {
   items             BookingItem[]
   payments          Payment[]
   housekeepingTasks HousekeepingTask[]
+  financeTxs        FinanceTx[]
 
   @@index([statusId])
   @@index([customerId])
@@ -319,6 +324,38 @@ model HousekeepingTask {
   @@index([statusId])
   @@index([assigneeId])
   @@index([scheduledAt])
+  @@index([deletedAt])
+}
+
+enum FinanceTxType {
+  INCOME
+  EXPENSE
+}
+
+model FinanceTx {
+  id          String        @id @default(cuid())
+  code        String        @unique           // TC001..
+  type        FinanceTxType
+  groupId     String                          // FK Category(FINANCE_GROUP)
+  group       Category      @relation("FinanceTxGroup", fields: [groupId], references: [id])
+  bookingId   String?
+  booking     Booking?      @relation(fields: [bookingId], references: [id])
+  methodId    String?
+  method      Category?     @relation("FinanceTxMethod", fields: [methodId], references: [id])
+  description String
+  amount      Decimal       @db.Decimal(15, 2)
+  occurredAt  DateTime      @db.Date
+  createdById String?
+  createdBy   User?         @relation("FinanceTxCreatedBy", fields: [createdById], references: [id])
+  note        String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  @@index([type])
+  @@index([groupId])
+  @@index([bookingId])
+  @@index([occurredAt])
   @@index([deletedAt])
 }
 

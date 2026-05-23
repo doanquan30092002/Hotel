@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-23
-**Current phase**: Phase 9 — Housekeeping FE ✓ (101/101 Playwright, lint 0w, typecheck 0e)
+**Current phase**: Phase 10 — Finance (Thu chi) BE ✓ (362/362 e2e, lint 0w, typecheck 0e)
 **Active branch**: `master`
 
 ## Phase status
@@ -73,7 +73,7 @@
   - [x] BE: `GET /api/v1/calendar?from&to&view&typeId&statusId&sourceId&keyword` — read-only endpoint, no new models, 25/25 e2e PASS (258 total)
 - [x] **8. Tìm phòng trống nhanh** (BE complete — 271 e2e total; FE complete — 90/90 Playwright, lint 0w, typecheck 0e)
 - [x] **9. Housekeeping (Dọn phòng)** (BE complete — 312 e2e total, lint 0w, typecheck 0e; FE complete — 101/101 Playwright, lint 0w, typecheck 0e)
-- [ ] 10. Finance (Thu chi)
+- [x] **10. Finance (Thu chi)** (BE complete — 362 e2e total, lint 0w, typecheck 0e; FE complete — 115/115 Playwright, lint 0w, typecheck 0e)
 - [ ] 11. Staff + Payroll
 - [ ] 12. Uploads (Tệp upload)
 - [ ] 13. Dashboard
@@ -82,10 +82,27 @@
 
 ## Currently working on
 
-- **Status**: Phase 9 (Housekeeping / Dọn phòng) FE HOÀN TẤT — 101/101 Playwright, lint 0w / typecheck 0e.
+- **Status**: Phase 10 (Finance / Thu chi) FE HOÀN TẤT — 115/115 Playwright, lint 0w / typecheck 0e.
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 9 FE result**: Types `housekeeping.ts` + hook `use-housekeeping.ts` (7 hooks) + `use-users.ts` (reusable users hook) + page `/don-phong` full implementation + `HousekeepingFormDialog` + 11 Playwright tests.
-- **Next**: Phase 10 — Finance (Thu chi).
+- **Phase 10 FE result**: Types `finance.ts` + hook `use-finance.ts` (7 hooks) + page `/thu-chi` full implementation + `FinanceFormDialog` + 14 Playwright tests.
+- **Next**: Phase 11 — Staff + Payroll.
+
+### Phase 10 — files (BE)
+
+- `apps/api/prisma/schema.prisma` — `FinanceTxType` enum + `FinanceTx` model + inverse relations on Category (`financeTxsAsGroup`, `financeTxsAsMethod`), Booking (`financeTxs`), User (`financeTxsCreated`)
+- `apps/api/prisma/migrations/20260523103114_08_finance/migration.sql`
+- `apps/api/prisma/seed.ts` — `seedFinanceTxs()` with TC001..TC006
+- `apps/api/src/finance/finance.module.ts`
+- `apps/api/src/finance/finance.service.ts` — `nextCode()` (TC###), `assertCategoryGroup()`, `assertBookingExists()`, `getSummary()` (JS aggregation), `getBookingPayments()`, 5 CRUD methods
+- `apps/api/src/finance/finance.controller.ts` — 7 endpoints with Swagger + RBAC (ADMIN/MANAGER only)
+- `apps/api/src/finance/dto/create-finance-tx.dto.ts`
+- `apps/api/src/finance/dto/update-finance-tx.dto.ts`
+- `apps/api/src/finance/dto/query-finance-tx.dto.ts`
+- `apps/api/src/finance/dto/finance-summary-query.dto.ts`
+- `apps/api/src/finance/dto/booking-payments-query.dto.ts`
+- `apps/api/src/finance/entities/finance-tx.entity.ts`
+- `apps/api/src/app.module.ts` — registered FinanceModule
+- `apps/api/test/finance.e2e-spec.ts` — 50 tests (362 total)
 
 ### Phase 9 — files (BE)
 

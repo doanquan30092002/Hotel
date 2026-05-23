@@ -525,6 +525,96 @@ avoid hardcoded IDs that break across re-seeds.
 | PATCH assign          | ADMIN/MANAGER only                                  |
 | DELETE                | ADMIN/MANAGER only                                  |
 
+## Patterns added in Phase 10
+
+### FinanceTx polymorphic-via-type pattern
+
+`FinanceTx` uses a `FinanceTxType` enum (`INCOME` / `EXPENSE`) instead of separate models or a
+polymorphic relationship. All grouping/aggregation differentiates via `type` at query time.
+
+Named relations are required because `Category` is referenced twice from `FinanceTx` (for `group`
+and `method`):
+
+```prisma
+group  Category  @relation("FinanceTxGroup",  fields: [groupId],  references: [id])
+method Category? @relation("FinanceTxMethod", fields: [methodId], references: [id])
+
+// On Category:
+financeTxsAsGroup  FinanceTx[] @relation("FinanceTxGroup")
+financeTxsAsMethod FinanceTx[] @relation("FinanceTxMethod")
+```
+
+### Summary endpoint: JS aggregation pattern
+
+For lightweight summary over ≤hundreds of records, fetch all matching rows with `findMany` and
+aggregate in JavaScript (not SQL `groupBy`) — this avoids complex Prisma `groupBy` with multiple
+keys and gives full flexibility:
+
+```ts
+const txs = await prisma.financeTx.findMany({
+  where: { deletedAt: null, occurredAt: { gte: fromDate, lt: toDate } },
+  include: { group: { select: { id: true, code: true, name: true } } },
+});
+
+let totalIncome = new Prisma.Decimal(0);
+const byGroupMap = new Map<string, { amount: Prisma.Decimal; count: number; ... }>();
+
+for (const tx of txs) {
+  if (tx.type === FinanceTxType.INCOME) totalIncome = totalIncome.add(tx.amount);
+  const key = `${tx.type}::${tx.groupId}`;
+  // upsert into map
+}
+```
+
+### RBAC: ADMIN + MANAGER only (finance module)
+
+All 7 finance endpoints (including `/summary` and `/booking-payments`) are restricted to
+`ADMIN` and `MANAGER`. `RECEPTIONIST` and `HOUSEKEEPING` get 403 on any finance endpoint.
+
+```ts
+const FINANCE_ROLES = [UserRole.ADMIN, UserRole.MANAGER];
+```
+
+### Summary `from >= to` validation → 422
+
+Business rule violations (not validation errors) use `UnprocessableEntityException`:
+
+```ts
+if (query.from >= query.to) {
+  throw new UnprocessableEntityException('from phải nhỏ hơn to');
+}
+```
+
+String comparison works for ISO8601 date strings (`YYYY-MM-DD`) because lexicographic order
+matches chronological order.
+
+### getBookingPayments: Payment table join with Booking → Customer → Room
+
+```ts
+const payments = await prisma.payment.findMany({
+  where: { deletedAt: null, paidAt: { gte: from, lt: to } },
+  include: {
+    method: { select: { id, code, name } },
+    booking: {
+      select: {
+        id,
+        code,
+        customer: { select: { fullName } },
+        items: { where: { kind: 'ROOM' }, take: 1, include: { room: { select: { name } } } },
+      },
+    },
+  },
+  orderBy: { paidAt: 'desc' },
+  take: limit,
+});
+const roomLabel = payment.booking.items[0]?.room?.name ?? '—';
+```
+
+### forbidNonWhitelisted: true catches extra DTO fields
+
+When `ValidationPipe` has `forbidNonWhitelisted: true`, any field not declared in the DTO (like
+an auto-generated `code`) causes a 400. Never include auto-generated fields in create DTOs.
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

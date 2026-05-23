@@ -479,3 +479,81 @@ const filteredUsers = useMemo(() => (usersData?.data ?? []).filter(...), [usersD
 - `todayIso()` / `tomorrowIso()` helpers in dialog file: compute date strings client-side with `new Date()` avoiding SSR concerns (dialog is always client-rendered).
 - Items table for DISCOUNT rows: refName field is writable (user types description), not auto-filled from a select — use same `<Input>` for both the "ref selector" column and the refName column but hide the duplicate.
 - `items` table `kind` column uses `watch('items.${index}.kind')` to react to form state — ensures live badge update when kind changes.
+
+## Phase 10 patterns (Finance / Thu chi)
+
+### 2-panel layout
+
+```tsx
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+  <Card className="lg:col-span-2 p-0">
+    {' '}
+    {/* left: table */}
+    <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <h2 className="text-base font-semibold">...</h2>
+      <div className="flex items-center gap-2">{/* buttons */}</div>
+    </div>
+    <CardContent className="p-0">{/* table */}</CardContent>
+    {/* pagination footer */}
+  </Card>
+  <Card className="p-4">{/* right: booking payments sidebar */}</Card>
+</div>
+```
+
+### Finance type badge palette
+
+- `INCOME` → `bg-emerald-100 text-emerald-700` label "Thu"
+- `EXPENSE` → `bg-rose-100 text-rose-700` label "Chi"
+
+### KPI cards for financial summary
+
+- `totalIncome` → emerald color
+- `totalExpense - payrollExpense` (operation expense) → rose color
+- `payrollExpense` → orange color
+- `netProfit` → emerald if >= 0, rose if < 0. Sub-label "Âm — cần chú ý" when negative.
+
+### Page-level RBAC gate (ADMIN/MANAGER only)
+
+```tsx
+const canManage = hasRole('ADMIN', 'MANAGER');
+if (!canManage) return <PermissionDenied />;
+```
+
+This is appropriate for finance pages that only ADMIN and MANAGER should view. RECEPTIONIST and HOUSEKEEPING get a "Bạn không có quyền truy cập" panel. The dashboard layout renders after `/auth/me` completes, so `canManage` is always evaluated with the correct user role.
+
+### FINANCE_KEYS query keys
+
+```ts
+export const FINANCE_KEYS = {
+  all: ['finance'] as const,
+  list: (p) => ['finance', 'list', p] as const,
+  detail: (id) => ['finance', 'detail', id] as const,
+  summary: (p) => ['finance', 'summary', p] as const,
+  bookingPayments: (p) => ['finance', 'booking-payments', p] as const,
+};
+```
+
+### Default date range (current month)
+
+```ts
+const today = new Date();
+const defaultFrom = toIso(new Date(today.getFullYear(), today.getMonth(), 1));
+const defaultTo = toIso(new Date(today.getFullYear(), today.getMonth() + 1, 1));
+```
+
+`toIso(date)` = manual `getFullYear/getMonth/getDate + padStart` to avoid timezone issues.
+
+### Playwright route ordering for finance (3 sub-endpoints + catch-all)
+
+Register in LIFO order (last fires first):
+
+1. FIRST: `**/api/v1/finance**` catch-all (fires LAST)
+2. LAST: `**/api/v1/finance/summary**` (fires FIRST)
+3. LAST: `**/api/v1/finance/booking-payments**` (fires FIRST)
+
+Without this ordering, the catch-all swallows summary and booking-payments requests.
+
+### Strict mode violations in Playwright
+
+- `getByText(/BK001/)` matches multiple elements if the code appears in table cells AND booking payment rows → use `getByText(/BK001 – Standard/)` to be specific.
+- `getByText('Tạo phiếu thu chi')` matches both the button text and the dialog heading → use `getByRole('heading', { name: 'Tạo phiếu thu chi' })` for the dialog title assertion.

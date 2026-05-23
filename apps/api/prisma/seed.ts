@@ -9,7 +9,14 @@ for (const candidate of [resolve(__dirname, '../../../.env'), resolve(__dirname,
   }
 }
 
-import { BookingItemKind, CategoryGroup, Prisma, PrismaClient, UserRole } from '@prisma/client';
+import {
+  BookingItemKind,
+  CategoryGroup,
+  FinanceTxType,
+  Prisma,
+  PrismaClient,
+  UserRole,
+} from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
@@ -1151,6 +1158,158 @@ async function seedHousekeepingTasks(): Promise<void> {
   console.log('Seed housekeeping tasks: 5 rows upserted (DP001..DP005)');
 }
 
+async function seedFinanceTxs(): Promise<void> {
+  // Resolve the admin user for createdById
+  const adminUser = await prisma.user.findFirstOrThrow({
+    where: { email: process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local', deletedAt: null },
+    select: { id: true },
+  });
+
+  // Resolve group IDs
+  const groupRoomRevenue = await getCategoryIdByGroupCode(
+    CategoryGroup.FINANCE_GROUP,
+    'room_revenue',
+  );
+  const groupServiceRevenue = await getCategoryIdByGroupCode(
+    CategoryGroup.FINANCE_GROUP,
+    'service_revenue',
+  );
+  const groupPayrollExpense = await getCategoryIdByGroupCode(
+    CategoryGroup.FINANCE_GROUP,
+    'payroll_expense',
+  );
+  const groupUtilities = await getCategoryIdByGroupCode(CategoryGroup.FINANCE_GROUP, 'utilities');
+  const groupSupplies = await getCategoryIdByGroupCode(CategoryGroup.FINANCE_GROUP, 'supplies');
+
+  // Resolve payment method IDs
+  const methodCash = await getCategoryIdByGroupCode(CategoryGroup.PAYMENT_METHOD, 'cash');
+  const methodBankTransfer = await getCategoryIdByGroupCode(
+    CategoryGroup.PAYMENT_METHOD,
+    'bank_transfer',
+  );
+
+  // Resolve booking IDs
+  const bk001 = await prisma.booking.findUniqueOrThrow({
+    where: { code: 'BK001' },
+    select: { id: true },
+  });
+  const bk002 = await prisma.booking.findUniqueOrThrow({
+    where: { code: 'BK002' },
+    select: { id: true },
+  });
+
+  interface FinanceTxSeed {
+    code: string;
+    type: FinanceTxType;
+    groupId: string;
+    bookingId: string | null;
+    methodId: string | null;
+    description: string;
+    amount: number;
+    occurredAt: string;
+    createdById: string;
+  }
+
+  const FINANCE_TX_SEEDS: FinanceTxSeed[] = [
+    {
+      code: 'TC001',
+      type: FinanceTxType.INCOME,
+      groupId: groupRoomRevenue,
+      bookingId: bk001.id,
+      methodId: methodCash,
+      description: 'Thu phòng BK001',
+      amount: 1500000,
+      occurredAt: '2026-05-20',
+      createdById: adminUser.id,
+    },
+    {
+      code: 'TC002',
+      type: FinanceTxType.INCOME,
+      groupId: groupServiceRevenue,
+      bookingId: bk002.id,
+      methodId: methodBankTransfer,
+      description: 'Thu dịch vụ BBQ BK002',
+      amount: 1350000,
+      occurredAt: '2026-05-21',
+      createdById: adminUser.id,
+    },
+    {
+      code: 'TC003',
+      type: FinanceTxType.INCOME,
+      groupId: groupRoomRevenue,
+      bookingId: null,
+      methodId: methodCash,
+      description: 'Tiền cọc walk-in',
+      amount: 500000,
+      occurredAt: '2026-05-22',
+      createdById: adminUser.id,
+    },
+    {
+      code: 'TC004',
+      type: FinanceTxType.EXPENSE,
+      groupId: groupUtilities,
+      bookingId: null,
+      methodId: null,
+      description: 'Tiền điện tháng 5',
+      amount: 850000,
+      occurredAt: '2026-05-15',
+      createdById: adminUser.id,
+    },
+    {
+      code: 'TC005',
+      type: FinanceTxType.EXPENSE,
+      groupId: groupSupplies,
+      bookingId: null,
+      methodId: null,
+      description: 'Mua đồ tiêu hao',
+      amount: 1200000,
+      occurredAt: '2026-05-18',
+      createdById: adminUser.id,
+    },
+    {
+      code: 'TC006',
+      type: FinanceTxType.EXPENSE,
+      groupId: groupPayrollExpense,
+      bookingId: null,
+      methodId: null,
+      description: 'Lương tháng 4',
+      amount: 27300000,
+      occurredAt: '2026-05-05',
+      createdById: adminUser.id,
+    },
+  ];
+
+  for (const seed of FINANCE_TX_SEEDS) {
+    await prisma.financeTx.upsert({
+      where: { code: seed.code },
+      update: {
+        type: seed.type,
+        groupId: seed.groupId,
+        bookingId: seed.bookingId,
+        methodId: seed.methodId,
+        description: seed.description,
+        amount: new Prisma.Decimal(seed.amount),
+        occurredAt: new Date(seed.occurredAt),
+        createdById: seed.createdById,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        type: seed.type,
+        groupId: seed.groupId,
+        bookingId: seed.bookingId,
+        methodId: seed.methodId,
+        description: seed.description,
+        amount: new Prisma.Decimal(seed.amount),
+        occurredAt: new Date(seed.occurredAt),
+        createdById: seed.createdById,
+      },
+    });
+  }
+
+  console.log(`Seed finance transactions: ${FINANCE_TX_SEEDS.length} rows upserted`);
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -1187,6 +1346,7 @@ async function main() {
   await seedPricePackages();
   await seedBookings();
   await seedHousekeepingTasks();
+  await seedFinanceTxs();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }
