@@ -385,6 +385,83 @@ Reset `page = 1` khi: pageSize đổi, keyword đổi (debounce), filter đổi.
   2. Register specific `**/api/v1/rooms/available**` LAST (fires first, takes priority).
 - Without this ordering, the catch-all `rooms**` swallows all `rooms/available` requests.
 
+## Phase 9 patterns (Housekeeping / Dọn phòng)
+
+### Priority badge palette
+
+```tsx
+function PriorityBadge({ priority }: { priority: 'high' | 'normal' | 'low' }) {
+  const map = {
+    high: ['Cao', 'bg-rose-100 text-rose-700'],
+    normal: ['Trung bình', 'bg-amber-100 text-amber-700'],
+    low: ['Thấp', 'bg-zinc-100 text-zinc-700'],
+  } as const;
+  const [label, cls] = map[priority];
+  return <Badge className={`${cls} border-0 text-xs whitespace-nowrap`}>{label}</Badge>;
+}
+```
+
+### Task status badge palette (code → class)
+
+- `waiting` → `bg-amber-100 text-amber-700`
+- `in_progress` → `bg-sky-100 text-sky-700`
+- `done` → `bg-emerald-100 text-emerald-700`
+- `skipped` → `bg-zinc-100 text-zinc-700`
+
+### Time range cell
+
+```tsx
+function formatTimeRange(start: string | null, end: string | null): string {
+  if (start && end) return `${start} → ${end}`;
+  if (start) return `${start} →`;
+  return '—';
+}
+```
+
+Show `"HH:MM → HH:MM"` when both present; `"HH:MM →"` when only start; `"—"` when neither.
+
+### Assignee dropdown with users API
+
+- Created `apps/web/src/lib/hooks/use-users.ts` — `USER_KEYS` + `useUsers(params: { page?, pageSize?, keyword?, role? })`. No built-in role filter on server — filter client-side if needed.
+- `housekeepingUsers = useMemo(() => (usersData?.data ?? []).filter(u => u.role === 'HOUSEKEEPING' || u.role === 'MANAGER' || u.role === 'ADMIN'), [usersData])` — show all relevant roles in assignee dropdown.
+- Use `'__none__'` as the "unassigned" Select value. Map `'__none__'` → `null` before posting to BE.
+
+### HOUSEKEEPING_KEYS
+
+```ts
+export const HOUSEKEEPING_KEYS = {
+  all: ['housekeeping'] as const,
+  list: (params: HousekeepingListQuery) => ['housekeeping', 'list', params] as const,
+  detail: (id: string) => ['housekeeping', 'detail', id] as const,
+};
+```
+
+### Priority filter with typed state
+
+```tsx
+const [priorityFilter, setPriorityFilter] = useState<HousekeepingPriority | ''>('');
+// ...
+priority: (priorityFilter || undefined,
+  // In Select onValueChange:
+  setPriorityFilter(v === '__all__' ? '' : (v as HousekeepingPriority)));
+```
+
+### useMemo for query data arrays used in useEffect deps
+
+When a `const arr = data?.something ?? []` is used in a `useEffect` dependency array, ESLint `react-hooks/exhaustive-deps` warns it changes every render. Fix:
+
+```ts
+// WRONG: const statuses = statusesData?.data ?? [];
+// CORRECT:
+const statuses = useMemo(() => statusesData?.data ?? [], [statusesData]);
+```
+
+Same applies to filtered arrays derived from query data — do NOT create intermediate `const allUsers = data?.data ?? []` then filter in another useMemo; instead filter directly from the query data inside a single useMemo:
+
+```ts
+const filteredUsers = useMemo(() => (usersData?.data ?? []).filter(...), [usersData]);
+```
+
 ## Phase 6 patterns (Bookings)
 
 - `BOOKING_KEYS` follows same shape as other keys: `['bookings']` base, `['bookings','list',params]`, `['bookings','detail',id]`.

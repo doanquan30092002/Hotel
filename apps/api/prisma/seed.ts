@@ -995,6 +995,162 @@ async function seedBookings(): Promise<void> {
   console.log('Seed bookings: 3 rows upserted (BK001, BK002, BK003)');
 }
 
+async function seedHousekeepingTasks(): Promise<void> {
+  // Resolve status IDs
+  const statusWaiting = await getCategoryIdByGroupCode(
+    CategoryGroup.HOUSEKEEPING_TASK_STATUS,
+    'waiting',
+  );
+  const statusInProgress = await getCategoryIdByGroupCode(
+    CategoryGroup.HOUSEKEEPING_TASK_STATUS,
+    'in_progress',
+  );
+  const statusDone = await getCategoryIdByGroupCode(CategoryGroup.HOUSEKEEPING_TASK_STATUS, 'done');
+
+  // Resolve room IDs
+  const roomP101 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'P101' },
+    select: { id: true },
+  });
+  const roomP201 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'P201' },
+    select: { id: true },
+  });
+  const roomP301 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'P301' },
+    select: { id: true },
+  });
+  const roomB101 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'B101' },
+    select: { id: true },
+  });
+  const roomV101 = await prisma.room.findUniqueOrThrow({
+    where: { code: 'V101' },
+    select: { id: true },
+  });
+
+  // Resolve booking ID for BK001
+  const bk001 = await prisma.booking.findUniqueOrThrow({
+    where: { code: 'BK001' },
+    select: { id: true },
+  });
+
+  // Resolve admin user for assignee of DP002
+  const adminUser = await prisma.user.findFirstOrThrow({
+    where: { email: process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local', deletedAt: null },
+    select: { id: true },
+  });
+
+  const tasks = [
+    {
+      code: 'DP001',
+      roomId: roomP101.id,
+      bookingId: bk001.id,
+      statusId: statusWaiting,
+      assigneeId: null as string | null,
+      priority: 'high',
+      description: 'Dọn dẹp sau check-out',
+      scheduledAt: new Date('2026-05-22'),
+      startTime: null as string | null,
+      endTime: null as string | null,
+      completedAt: null as Date | null,
+      note: null as string | null,
+    },
+    {
+      code: 'DP002',
+      roomId: roomP201.id,
+      bookingId: null as string | null,
+      statusId: statusInProgress,
+      assigneeId: adminUser.id,
+      priority: 'normal',
+      description: 'Kiểm tra trước check-in',
+      scheduledAt: new Date('2026-05-23'),
+      startTime: '10:15',
+      endTime: null as string | null,
+      completedAt: null as Date | null,
+      note: null as string | null,
+    },
+    {
+      code: 'DP003',
+      roomId: roomP301.id,
+      bookingId: null as string | null,
+      statusId: statusDone,
+      assigneeId: null as string | null,
+      priority: 'normal',
+      description: 'Vệ sinh định kỳ',
+      scheduledAt: new Date('2026-05-22'),
+      startTime: null as string | null,
+      endTime: null as string | null,
+      completedAt: new Date('2026-05-22T09:00:00Z'),
+      note: null as string | null,
+    },
+    {
+      code: 'DP004',
+      roomId: roomB101.id,
+      bookingId: null as string | null,
+      statusId: statusWaiting,
+      assigneeId: null as string | null,
+      priority: 'normal',
+      description: 'Dọn dẹp bungalow',
+      scheduledAt: new Date('2026-05-24'),
+      startTime: null as string | null,
+      endTime: null as string | null,
+      completedAt: null as Date | null,
+      note: null as string | null,
+    },
+    {
+      code: 'DP005',
+      roomId: roomV101.id,
+      bookingId: null as string | null,
+      statusId: statusWaiting,
+      assigneeId: null as string | null,
+      priority: 'high',
+      description: 'Kiểm tra phòng VIP',
+      scheduledAt: new Date('2026-05-25'),
+      startTime: null as string | null,
+      endTime: null as string | null,
+      completedAt: null as Date | null,
+      note: null as string | null,
+    },
+  ];
+
+  for (const seed of tasks) {
+    await prisma.housekeepingTask.upsert({
+      where: { code: seed.code },
+      update: {
+        roomId: seed.roomId,
+        bookingId: seed.bookingId,
+        statusId: seed.statusId,
+        assigneeId: seed.assigneeId,
+        priority: seed.priority,
+        description: seed.description,
+        scheduledAt: seed.scheduledAt,
+        startTime: seed.startTime,
+        endTime: seed.endTime,
+        completedAt: seed.completedAt,
+        note: seed.note,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        roomId: seed.roomId,
+        bookingId: seed.bookingId,
+        statusId: seed.statusId,
+        assigneeId: seed.assigneeId,
+        priority: seed.priority,
+        description: seed.description,
+        scheduledAt: seed.scheduledAt,
+        startTime: seed.startTime,
+        endTime: seed.endTime,
+        completedAt: seed.completedAt,
+        note: seed.note,
+      },
+    });
+  }
+
+  console.log('Seed housekeeping tasks: 5 rows upserted (DP001..DP005)');
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -1030,6 +1186,7 @@ async function main() {
   await seedServices();
   await seedPricePackages();
   await seedBookings();
+  await seedHousekeepingTasks();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }

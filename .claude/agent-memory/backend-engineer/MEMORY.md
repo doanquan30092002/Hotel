@@ -451,6 +451,80 @@ return {
 };
 ```
 
+## Patterns added in Phase 9
+
+### User named-relation for housekeeping assignee
+
+When a `User` is referenced from a business entity with a non-standard relation name, use a named
+relation on both sides:
+
+```prisma
+// In HousekeepingTask model:
+assignee    User?     @relation("HousekeepingAssignee", fields: [assigneeId], references: [id])
+
+// In User model (inverse):
+housekeepingTasksAsAssignee HousekeepingTask[] @relation("HousekeepingAssignee")
+```
+
+The naming convention `<ModelName>sAs<Role>` (e.g. `housekeepingTasksAsAssignee`) mirrors the
+`roomsAsType`, `roomsAsStatus` pattern used in Phase 3 for Category.
+
+### Nullable assignee with null sentinel on PATCH/assign
+
+The `assign` endpoint accepts `{ assigneeId: string | null }`. Passing `null` explicitly
+unassigns the current assignee:
+
+```ts
+// DTO:
+export class AssignDto {
+  @IsOptional()
+  @IsString()
+  assigneeId?: string | null;
+}
+
+// Service:
+await prisma.housekeepingTask.update({
+  where: { id },
+  data: { assigneeId: dto.assigneeId ?? null },
+});
+```
+
+This differs from `UpdateHousekeepingTaskDto` (PartialType) where `'assigneeId' in dto` is used
+to distinguish "not provided" (skip) from `null` (explicitly clear).
+
+### Auto-completedAt on status flip to "done"
+
+When the HOUSEKEEPING_TASK_STATUS flips to `done`, auto-set `completedAt = new Date()` only if
+it was not already set (idempotent):
+
+```ts
+const doneId = await this.getDoneStatusId();
+const completedAt =
+  doneId && dto.statusId === doneId && !existing.completedAt ? new Date() : undefined;
+
+await prisma.housekeepingTask.update({
+  where: { id },
+  data: {
+    statusId: dto.statusId,
+    ...(completedAt !== undefined ? { completedAt } : {}),
+  },
+});
+```
+
+`getDoneStatusId()` fetches the category by `(HOUSEKEEPING_TASK_STATUS, 'done')` dynamically to
+avoid hardcoded IDs that break across re-seeds.
+
+### RBAC split for housekeeping tasks
+
+| Endpoint              | Roles                                               |
+| --------------------- | --------------------------------------------------- |
+| GET list / GET detail | ALL (ADMIN/MANAGER/RECEPTIONIST/HOUSEKEEPING)       |
+| POST create           | ALL (housekeeping staff can create their own tasks) |
+| PATCH update          | ADMIN/MANAGER/HOUSEKEEPING (RECEPTIONIST excluded)  |
+| PATCH status          | ADMIN/MANAGER/HOUSEKEEPING                          |
+| PATCH assign          | ADMIN/MANAGER only                                  |
+| DELETE                | ADMIN/MANAGER only                                  |
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

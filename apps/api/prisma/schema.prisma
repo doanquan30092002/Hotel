@@ -36,7 +36,8 @@ model User {
   updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
 
-  auditLogs AuditLog[]
+  auditLogs                  AuditLog[]
+  housekeepingTasksAsAssignee HousekeepingTask[] @relation("HousekeepingAssignee")
 
   @@index([role, status])
 }
@@ -101,6 +102,8 @@ model Category {
   bookingItemsAsSurchargeType BookingItem[] @relation("BookingItemSurchargeType")
   paymentsAsMethod    Payment[]     @relation("PaymentMethod")
 
+  housekeepingTasksAsStatus HousekeepingTask[] @relation("HousekeepingStatus")
+
   @@unique([group, code])
   @@index([group, active, sortOrder])
 }
@@ -129,7 +132,8 @@ model Room {
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
 
-  bookingItems BookingItem[]
+  bookingItems     BookingItem[]
+  housekeepingTasks HousekeepingTask[]
 
   @@index([typeId])
   @@index([statusId])
@@ -238,8 +242,9 @@ model Booking {
   updatedAt       DateTime      @updatedAt
   deletedAt       DateTime?
 
-  items    BookingItem[]
-  payments Payment[]
+  items             BookingItem[]
+  payments          Payment[]
+  housekeepingTasks HousekeepingTask[]
 
   @@index([statusId])
   @@index([customerId])
@@ -285,6 +290,35 @@ model Payment {
   deletedAt DateTime?
 
   @@index([bookingId])
+  @@index([deletedAt])
+}
+
+model HousekeepingTask {
+  id          String    @id @default(cuid())
+  code        String    @unique           // DP001, DP002, ...
+  roomId      String
+  room        Room      @relation(fields: [roomId], references: [id])
+  bookingId   String?
+  booking     Booking?  @relation(fields: [bookingId], references: [id])
+  statusId    String
+  status      Category  @relation("HousekeepingStatus", fields: [statusId], references: [id])
+  assigneeId  String?
+  assignee    User?     @relation("HousekeepingAssignee", fields: [assigneeId], references: [id])
+  priority    String    @default("normal") // "high" | "normal" | "low"
+  description String
+  scheduledAt DateTime  @db.Date
+  startTime   String?   // "HH:mm"
+  endTime     String?   // "HH:mm"
+  completedAt DateTime?
+  note        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([roomId])
+  @@index([statusId])
+  @@index([assigneeId])
+  @@index([scheduledAt])
   @@index([deletedAt])
 }
 

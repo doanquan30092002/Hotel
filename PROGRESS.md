@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-23
-**Current phase**: Phase 8 — Tìm phòng trống FE ✓ (90/90 Playwright, lint 0w, typecheck 0e)
+**Current phase**: Phase 9 — Housekeeping FE ✓ (101/101 Playwright, lint 0w, typecheck 0e)
 **Active branch**: `master`
 
 ## Phase status
@@ -72,7 +72,7 @@
 - [x] **7. Calendar booking** (FE complete — 80/80 Playwright; BE in parallel)
   - [x] BE: `GET /api/v1/calendar?from&to&view&typeId&statusId&sourceId&keyword` — read-only endpoint, no new models, 25/25 e2e PASS (258 total)
 - [x] **8. Tìm phòng trống nhanh** (BE complete — 271 e2e total; FE complete — 90/90 Playwright, lint 0w, typecheck 0e)
-- [ ] 9. Housekeeping
+- [x] **9. Housekeeping (Dọn phòng)** (BE complete — 312 e2e total, lint 0w, typecheck 0e; FE complete — 101/101 Playwright, lint 0w, typecheck 0e)
 - [ ] 10. Finance (Thu chi)
 - [ ] 11. Staff + Payroll
 - [ ] 12. Uploads (Tệp upload)
@@ -82,11 +82,36 @@
 
 ## Currently working on
 
-- **Status**: Phase 8 (Tìm phòng trống nhanh) HOÀN TẤT — BE 271/271 e2e + FE 90/90 Playwright, lint 0w / typecheck 0e.
+- **Status**: Phase 9 (Housekeeping / Dọn phòng) FE HOÀN TẤT — 101/101 Playwright, lint 0w / typecheck 0e.
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 8 BE result**: `GET /api/v1/rooms/available` endpoint added to existing RoomsController. No new models/migration. Anti-overlap formula reused from BookingsService (cancelled + checked_out statuses are non-blocking). Filters: typeId, capacity (gte), keyword. Meta: totalRooms, totalAvailable, totalBooked.
-- **Phase 8 FE result**: Hook `useAvailableRooms` + page `/phong-trong` with filter bar + KPI row + responsive room card grid + `BookingFormDialog` extended with `initialValues` prop. 10 new Playwright tests.
-- **Next**: Phase 9 — Housekeeping (Dọn phòng).
+- **Phase 9 FE result**: Types `housekeeping.ts` + hook `use-housekeeping.ts` (7 hooks) + `use-users.ts` (reusable users hook) + page `/don-phong` full implementation + `HousekeepingFormDialog` + 11 Playwright tests.
+- **Next**: Phase 10 — Finance (Thu chi).
+
+### Phase 9 — files (BE)
+
+- `apps/api/prisma/schema.prisma` — `HousekeepingTask` model + inverse relations on User (`housekeepingTasksAsAssignee`), Category (`housekeepingTasksAsStatus`), Room (`housekeepingTasks`), Booking (`housekeepingTasks`)
+- `apps/api/prisma/migrations/20260523101428_07_housekeeping/migration.sql`
+- `apps/api/prisma/seed.ts` — `seedHousekeepingTasks()` with DP001..DP005
+- `apps/api/src/housekeeping/housekeeping.module.ts`
+- `apps/api/src/housekeeping/housekeeping.service.ts` — `nextCode()` (DP###), `assertCategoryGroup()`, `assertRoomExists()`, `assertBookingExists()`, `assertUserExists()`, `getDoneStatusId()`, auto-`completedAt` on status flip to done, 7 CRUD methods
+- `apps/api/src/housekeeping/housekeeping.controller.ts` — 7 endpoints with Swagger + RBAC
+- `apps/api/src/housekeeping/dto/create-housekeeping-task.dto.ts`
+- `apps/api/src/housekeeping/dto/update-housekeeping-task.dto.ts`
+- `apps/api/src/housekeeping/dto/query-housekeeping-task.dto.ts`
+- `apps/api/src/housekeeping/dto/change-status.dto.ts`
+- `apps/api/src/housekeeping/dto/assign.dto.ts`
+- `apps/api/src/housekeeping/entities/housekeeping-task.entity.ts`
+- `apps/api/src/app.module.ts` — registered HousekeepingModule
+- `apps/api/test/housekeeping.e2e-spec.ts` — 41 tests (312 total)
+
+### Phase 9 — files (FE)
+
+- `apps/web/src/types/housekeeping.ts` — `HousekeepingTask`, `HousekeepingPriority`, `HousekeepingListQuery`, `CreateHousekeepingTaskInput`, `UpdateHousekeepingTaskInput`
+- `apps/web/src/lib/hooks/use-housekeeping.ts` — `HOUSEKEEPING_KEYS` + 7 hooks: `useHousekeepingTasks`, `useHousekeepingTask`, `useCreateHousekeepingTask`, `useUpdateHousekeepingTask`, `useDeleteHousekeepingTask`, `useChangeHousekeepingStatus`, `useAssignHousekeepingTask`
+- `apps/web/src/lib/hooks/use-users.ts` — reusable `USER_KEYS` + `useUsers(params)` hook for listing users (assignee dropdown, etc.)
+- `apps/web/src/app/(dashboard)/don-phong/page.tsx` — full implementation replacing ComingSoon: toolbar (search debounce + status filter + priority filter + add btn) + table (10 cols: Mã/Ngày/Phòng/Booking/Công việc/Ưu tiên/Nhân sự/Giờ/Trạng thái/Thao tác) + priority badge (rose=high, amber=normal, zinc=low) + task status badge (waiting=amber, in_progress=sky, done=emerald, skipped=zinc) + time range display + loading/empty/error states + pagination footer always visible
+- `apps/web/src/app/(dashboard)/don-phong/housekeeping-form-dialog.tsx` — form dialog (create/edit/view): 10 fields (roomId, bookingId optional, statusId, priority, scheduledAt, assigneeId optional, startTime/endTime optional, description required, note optional)
+- `apps/web/tests/don-phong.spec.ts` — 11 offline Playwright tests
 
 ### Phase 8 — files (FE)
 
