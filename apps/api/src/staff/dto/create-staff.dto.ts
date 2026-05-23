@@ -17,11 +17,6 @@ export class CreateStaffDto {
   @IsNotEmpty({ message: 'Họ tên bắt buộc' })
   fullName!: string;
 
-  @ApiPropertyOptional({ description: 'ID phòng ban (STAFF_DEPARTMENT)' })
-  @IsOptional()
-  @IsString()
-  departmentId?: string;
-
   @ApiPropertyOptional({ description: 'ID chức vụ (STAFF_POSITION)' })
   @IsOptional()
   @IsString()

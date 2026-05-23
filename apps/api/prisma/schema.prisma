@@ -74,7 +74,6 @@ enum CategoryGroup {
   UNIT
   SERVICE_GROUP
   SURCHARGE_TYPE
-  STAFF_DEPARTMENT
   STAFF_POSITION
   PAYROLL_STATUS
 }
@@ -112,9 +111,8 @@ model Category {
   financeTxsAsGroup  FinanceTx[] @relation("FinanceTxGroup")
   financeTxsAsMethod FinanceTx[] @relation("FinanceTxMethod")
 
-  staffsAsDepartment Staff[]    @relation("StaffDepartment")
-  staffsAsPosition   Staff[]    @relation("StaffPosition")
-  payrollsAsStatus   Payroll[]  @relation("PayrollStatus")
+  staffsAsPosition Staff[]   @relation("StaffPosition")
+  payrollsAsStatus Payroll[] @relation("PayrollStatus")
 
   @@unique([group, code])
   @@index([group, active, sortOrder])
@@ -371,8 +369,6 @@ model Staff {
   id           String    @id @default(cuid())
   code         String    @unique           // NS001..
   fullName     String
-  departmentId String?
-  department   Category? @relation("StaffDepartment", fields: [departmentId], references: [id])
   positionId   String?
   position     Category? @relation("StaffPosition", fields: [positionId], references: [id])
   phone        String?
@@ -390,7 +386,6 @@ model Staff {
 
   payrolls Payroll[]
 
-  @@index([departmentId])
   @@index([positionId])
   @@index([active])
   @@index([deletedAt])

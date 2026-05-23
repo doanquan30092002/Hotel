@@ -12,7 +12,6 @@ import { StaffEntity } from './entities/staff.entity';
 // ── include constant ───────────────────────────────────────────────────────────
 
 const STAFF_INCLUDE = {
-  department: { select: { id: true, code: true, name: true } },
   position: { select: { id: true, code: true, name: true } },
 } as const;
 
@@ -69,7 +68,6 @@ export class StaffService {
 
     const where: Prisma.StaffWhereInput = {
       deletedAt: null,
-      ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.positionId ? { positionId: query.positionId } : {}),
       ...(query.active !== undefined ? { active: query.active } : {}),
       ...(query.keyword
@@ -112,13 +110,6 @@ export class StaffService {
   }
 
   async create(dto: CreateStaffDto): Promise<StaffEntity> {
-    if (dto.departmentId) {
-      await this.assertCategoryGroup(
-        dto.departmentId,
-        CategoryGroup.STAFF_DEPARTMENT,
-        'departmentId',
-      );
-    }
     if (dto.positionId) {
       await this.assertCategoryGroup(dto.positionId, CategoryGroup.STAFF_POSITION, 'positionId');
     }
@@ -129,7 +120,6 @@ export class StaffService {
       data: {
         code,
         fullName: dto.fullName,
-        departmentId: dto.departmentId ?? null,
         positionId: dto.positionId ?? null,
         phone: dto.phone ?? null,
         email: dto.email ?? null,
@@ -156,13 +146,6 @@ export class StaffService {
       throw new NotFoundException('Nhân viên không tồn tại');
     }
 
-    if (dto.departmentId !== undefined && dto.departmentId !== null) {
-      await this.assertCategoryGroup(
-        dto.departmentId,
-        CategoryGroup.STAFF_DEPARTMENT,
-        'departmentId',
-      );
-    }
     if (dto.positionId !== undefined && dto.positionId !== null) {
       await this.assertCategoryGroup(dto.positionId, CategoryGroup.STAFF_POSITION, 'positionId');
     }
@@ -171,7 +154,6 @@ export class StaffService {
       where: { id },
       data: {
         ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
-        ...('departmentId' in dto ? { departmentId: dto.departmentId ?? null } : {}),
         ...('positionId' in dto ? { positionId: dto.positionId ?? null } : {}),
         ...('phone' in dto ? { phone: dto.phone ?? null } : {}),
         ...('email' in dto ? { email: dto.email ?? null } : {}),

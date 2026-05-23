@@ -37,7 +37,6 @@ import type { Staff } from '@/types/staff';
 
 const schema = z.object({
   fullName: z.string().min(1, 'Vui lòng nhập họ tên'),
-  departmentId: z.string().nullable().optional(),
   positionId: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   email: z.string().email('Email không hợp lệ').nullable().optional().or(z.literal('')),
@@ -84,13 +83,6 @@ export function StaffFormDialog({ open, onOpenChange, mode, editTarget }: StaffF
   const isEdit = mode === 'edit';
 
   // Reference data
-  const { data: deptsData } = useCategories({
-    group: 'STAFF_DEPARTMENT',
-    active: true,
-    pageSize: 100,
-  });
-  const departments = useMemo(() => deptsData?.data ?? [], [deptsData]);
-
   const { data: posData } = useCategories({
     group: 'STAFF_POSITION',
     active: true,
@@ -119,7 +111,6 @@ export function StaffFormDialog({ open, onOpenChange, mode, editTarget }: StaffF
     resolver: zodResolver(schema),
     defaultValues: {
       fullName: '',
-      departmentId: null,
       positionId: null,
       phone: null,
       email: null,
@@ -139,7 +130,6 @@ export function StaffFormDialog({ open, onOpenChange, mode, editTarget }: StaffF
     if (mode === 'create') {
       reset({
         fullName: '',
-        departmentId: null,
         positionId: null,
         phone: null,
         email: null,
@@ -159,7 +149,6 @@ export function StaffFormDialog({ open, onOpenChange, mode, editTarget }: StaffF
     if ((isEdit || isView) && staffDetail) {
       reset({
         fullName: staffDetail.fullName,
-        departmentId: staffDetail.department?.id ?? null,
         positionId: staffDetail.position?.id ?? null,
         phone: staffDetail.phone ?? null,
         email: staffDetail.email ?? null,
@@ -177,7 +166,6 @@ export function StaffFormDialog({ open, onOpenChange, mode, editTarget }: StaffF
   function onSubmit(data: FormData) {
     const body = {
       fullName: data.fullName,
-      departmentId: data.departmentId ?? null,
       positionId: data.positionId ?? null,
       phone: data.phone ?? null,
       email: (data.email === '' ? null : data.email) ?? null,
@@ -258,36 +246,8 @@ export function StaffFormDialog({ open, onOpenChange, mode, editTarget }: StaffF
                 )}
               </div>
 
-              {/* Bộ phận */}
-              <div className="space-y-1.5">
-                <Label htmlFor="departmentId">Bộ phận</Label>
-                <Controller
-                  name="departmentId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ?? '__none__'}
-                      onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
-                      disabled={isView}
-                    >
-                      <SelectTrigger id="departmentId" className="h-10" aria-label="Chọn bộ phận">
-                        <SelectValue placeholder="Chọn bộ phận" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Không phân công</SelectItem>
-                        {departments.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-
               {/* Chức vụ */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="positionId">Chức vụ</Label>
                 <Controller
                   name="positionId"

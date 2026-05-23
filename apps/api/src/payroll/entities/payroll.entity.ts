@@ -7,7 +7,6 @@ type StaffRef = {
   code: string;
   fullName: string;
   avatarUrl: string | null;
-  department: CategoryRef | null;
   position: CategoryRef | null;
 };
 

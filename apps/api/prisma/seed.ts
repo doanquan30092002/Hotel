@@ -218,17 +218,6 @@ const CATEGORY_SEEDS: CategorySeed[] = [
   { group: CategoryGroup.SURCHARGE_TYPE, code: 'weekend', name: 'Phụ thu cuối tuần', sortOrder: 2 },
   { group: CategoryGroup.SURCHARGE_TYPE, code: 'holiday', name: 'Phụ thu lễ', sortOrder: 3 },
 
-  // STAFF_DEPARTMENT
-  { group: CategoryGroup.STAFF_DEPARTMENT, code: 'reception', name: 'Lễ tân', sortOrder: 0 },
-  {
-    group: CategoryGroup.STAFF_DEPARTMENT,
-    code: 'housekeeping',
-    name: 'Buồng phòng',
-    sortOrder: 1,
-  },
-  { group: CategoryGroup.STAFF_DEPARTMENT, code: 'kitchen', name: 'Bếp', sortOrder: 2 },
-  { group: CategoryGroup.STAFF_DEPARTMENT, code: 'management', name: 'Quản lý', sortOrder: 3 },
-
   // STAFF_POSITION
   { group: CategoryGroup.STAFF_POSITION, code: 'manager', name: 'Quản lý cơ sở', sortOrder: 0 },
   { group: CategoryGroup.STAFF_POSITION, code: 'receptionist', name: 'Lễ tân', sortOrder: 1 },
@@ -1336,7 +1325,6 @@ async function seedFinanceTxs(): Promise<void> {
 interface StaffSeed {
   code: string;
   fullName: string;
-  departmentCode: string;
   positionCode: string;
   phone: string;
   joinDate: string;
@@ -1348,7 +1336,6 @@ const STAFF_SEEDS: StaffSeed[] = [
   {
     code: 'NS001',
     fullName: 'Nguyễn Hiền An',
-    departmentCode: 'management',
     positionCode: 'manager',
     phone: '0900000001',
     joinDate: '2025-01-15',
@@ -1358,7 +1345,6 @@ const STAFF_SEEDS: StaffSeed[] = [
   {
     code: 'NS002',
     fullName: 'Lê Thảo My',
-    departmentCode: 'reception',
     positionCode: 'receptionist',
     phone: '0900000002',
     joinDate: '2025-10-01',
@@ -1368,8 +1354,7 @@ const STAFF_SEEDS: StaffSeed[] = [
   {
     code: 'NS003',
     fullName: 'Phạm Quốc Việt',
-    departmentCode: 'housekeeping',
-    positionCode: 'manager',
+    positionCode: 'housekeeper',
     phone: '0900000003',
     joinDate: '2025-10-25',
     baseSalary: 8500000,
@@ -1378,7 +1363,6 @@ const STAFF_SEEDS: StaffSeed[] = [
   {
     code: 'NS004',
     fullName: 'Trần Minh Khoa',
-    departmentCode: 'kitchen',
     positionCode: 'cook',
     phone: '0900000004',
     joinDate: '2025-08-10',
@@ -1388,7 +1372,6 @@ const STAFF_SEEDS: StaffSeed[] = [
   {
     code: 'NS005',
     fullName: 'Đặng Hoài Thu',
-    departmentCode: 'kitchen',
     positionCode: 'cook',
     phone: '0900000005',
     joinDate: '2025-12-15',
@@ -1398,7 +1381,6 @@ const STAFF_SEEDS: StaffSeed[] = [
   {
     code: 'NS006',
     fullName: 'Bùi Khánh Nam',
-    departmentCode: 'reception',
     positionCode: 'receptionist',
     phone: '0900000006',
     joinDate: '2025-12-22',
@@ -1409,10 +1391,6 @@ const STAFF_SEEDS: StaffSeed[] = [
 
 async function seedStaffs(): Promise<void> {
   for (const seed of STAFF_SEEDS) {
-    const departmentId = await getCategoryIdByGroupCode(
-      CategoryGroup.STAFF_DEPARTMENT,
-      seed.departmentCode,
-    );
     const positionId = await getCategoryIdByGroupCode(
       CategoryGroup.STAFF_POSITION,
       seed.positionCode,
@@ -1422,7 +1400,6 @@ async function seedStaffs(): Promise<void> {
       where: { code: seed.code },
       update: {
         fullName: seed.fullName,
-        departmentId,
         positionId,
         phone: seed.phone,
         joinDate: new Date(seed.joinDate),
@@ -1434,7 +1411,6 @@ async function seedStaffs(): Promise<void> {
       create: {
         code: seed.code,
         fullName: seed.fullName,
-        departmentId,
         positionId,
         phone: seed.phone,
         joinDate: new Date(seed.joinDate),

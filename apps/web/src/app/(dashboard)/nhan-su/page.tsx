@@ -201,9 +201,6 @@ function TableView({
               Họ tên
             </th>
             <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Bộ phận
-            </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Chức vụ
             </th>
             <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -286,9 +283,6 @@ function TableView({
                     </div>
                   </div>
                 </td>
-
-                {/* Bộ phận */}
-                <td className="px-3 py-3 text-sm">{s.department?.name ?? '—'}</td>
 
                 {/* Chức vụ */}
                 <td className="px-3 py-3 text-sm">{s.position?.name ?? '—'}</td>
@@ -396,7 +390,7 @@ export default function NhanSuPage() {
 function NhanSuContent({ canManage }: { canManage: boolean }) {
   const [keyword, setKeyword] = useState('');
   const dKeyword = useDebouncedValue(keyword, 300);
-  const [departmentId, setDepartmentId] = useState('');
+  const [positionId, setPositionId] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'true' | 'false'>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -407,13 +401,13 @@ function NhanSuContent({ canManage }: { canManage: boolean }) {
   const [formTarget, setFormTarget] = useState<Staff | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Staff | null>(null);
 
-  // Reference data for department filter
-  const { data: deptsData } = useCategories({
-    group: 'STAFF_DEPARTMENT',
+  // Reference data for position filter
+  const { data: positionsData } = useCategories({
+    group: 'STAFF_POSITION',
     active: true,
     pageSize: 100,
   });
-  const departments = deptsData?.data ?? [];
+  const positions = positionsData?.data ?? [];
 
   // Staff data
   const {
@@ -422,7 +416,7 @@ function NhanSuContent({ canManage }: { canManage: boolean }) {
     isError,
     refetch,
   } = useStaffs({
-    departmentId: departmentId || undefined,
+    positionId: positionId || undefined,
     active: activeFilter === 'all' ? undefined : activeFilter === 'true',
     keyword: dKeyword || undefined,
     page,
@@ -436,7 +430,7 @@ function NhanSuContent({ canManage }: { canManage: boolean }) {
 
   // KPI derivations (per-page, documented as nit)
   const activeCount = staffList.filter((s) => s.active).length;
-  const uniqueDepts = new Set(staffList.map((s) => s.department?.id).filter(Boolean)).size;
+  const uniquePositions = new Set(staffList.map((s) => s.position?.id).filter(Boolean)).size;
   const totalSalaryEstimate = staffList
     .filter((s) => s.active)
     .reduce((acc, s) => acc + Number(s.baseSalary) + Number(s.allowance), 0);
@@ -491,24 +485,24 @@ function NhanSuContent({ canManage }: { canManage: boolean }) {
             </div>
           </div>
 
-          {/* Department filter */}
+          {/* Position filter */}
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Bộ phận</label>
+            <label className="text-xs font-medium text-muted-foreground">Chức vụ</label>
             <Select
-              value={departmentId || '__all__'}
+              value={positionId || '__all__'}
               onValueChange={(v) => {
-                setDepartmentId(v === '__all__' ? '' : v);
+                setPositionId(v === '__all__' ? '' : v);
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-44 h-9 text-sm" aria-label="Lọc bộ phận">
-                <SelectValue placeholder="Tất cả bộ phận" />
+              <SelectTrigger className="w-44 h-9 text-sm" aria-label="Lọc chức vụ">
+                <SelectValue placeholder="Tất cả chức vụ" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Tất cả bộ phận</SelectItem>
-                {departments.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.name}
+                <SelectItem value="__all__">Tất cả chức vụ</SelectItem>
+                {positions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -568,8 +562,8 @@ function NhanSuContent({ canManage }: { canManage: boolean }) {
         />
         <KpiCard
           icon={<Building2 className="h-5 w-5 text-sky-600" aria-hidden="true" />}
-          label="Bộ phận"
-          value={String(uniqueDepts)}
+          label="Chức vụ"
+          value={String(uniquePositions)}
           isLoading={isLoading}
         />
         <KpiCard

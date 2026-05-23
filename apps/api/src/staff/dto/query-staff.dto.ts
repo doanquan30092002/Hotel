@@ -5,11 +5,6 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PageQueryDto } from '../../common/dto/page-query.dto';
 
 export class QueryStaffDto extends PageQueryDto {
-  @ApiPropertyOptional({ description: 'Lọc theo phòng ban (departmentId)' })
-  @IsOptional()
-  @IsString()
-  departmentId?: string;
-
   @ApiPropertyOptional({ description: 'Lọc theo chức vụ (positionId)' })
   @IsOptional()
   @IsString()

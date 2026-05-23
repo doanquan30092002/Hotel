@@ -63,13 +63,13 @@ const MOCK_ME_RECEPTIONIST = {
   },
 };
 
-const MOCK_DEPARTMENTS = {
+const MOCK_POSITIONS = {
   data: [
     {
-      id: 'dept1',
-      code: 'buong_phong',
-      name: 'Buồng phòng',
-      group: 'STAFF_DEPARTMENT',
+      id: 'pos1',
+      code: 'manager',
+      name: 'Quản lý cơ sở',
+      group: 'STAFF_POSITION',
       sortOrder: 0,
       active: true,
       meta: null,
@@ -77,10 +77,10 @@ const MOCK_DEPARTMENTS = {
       updatedAt: '2026-01-01T00:00:00Z',
     },
     {
-      id: 'dept2',
-      code: 'quan_ly',
-      name: 'Quản lý',
-      group: 'STAFF_DEPARTMENT',
+      id: 'pos2',
+      code: 'housekeeper',
+      name: 'Buồng phòng',
+      group: 'STAFF_POSITION',
       sortOrder: 1,
       active: true,
       meta: null,
@@ -91,30 +91,12 @@ const MOCK_DEPARTMENTS = {
   meta: { page: 1, pageSize: 100, total: 2, totalPages: 1 },
 };
 
-const MOCK_POSITIONS = {
-  data: [
-    {
-      id: 'pos1',
-      code: 'quan_ly_ca',
-      name: 'Quản lý ca',
-      group: 'STAFF_POSITION',
-      sortOrder: 0,
-      active: true,
-      meta: null,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    },
-  ],
-  meta: { page: 1, pageSize: 100, total: 1, totalPages: 1 },
-};
-
 const MOCK_STAFF_LIST = {
   data: [
     {
       id: 's1',
       code: 'NS001',
       fullName: 'Nguyễn Hữu An',
-      department: { id: 'dept2', code: 'quan_ly', name: 'Quản lý' },
       position: { id: 'pos1', code: 'quan_ly_ca', name: 'Quản lý ca' },
       phone: '0900000001',
       email: 'an@hotel.local',
@@ -132,7 +114,6 @@ const MOCK_STAFF_LIST = {
       id: 's2',
       code: 'NS002',
       fullName: 'Lê Trần Mỹ',
-      department: { id: 'dept1', code: 'buong_phong', name: 'Buồng phòng' },
       position: null,
       phone: '0900000002',
       email: null,
@@ -150,7 +131,6 @@ const MOCK_STAFF_LIST = {
       id: 's3',
       code: 'NS003',
       fullName: 'Phạm Quốc Việt',
-      department: { id: 'dept1', code: 'buong_phong', name: 'Buồng phòng' },
       position: null,
       phone: '0900000003',
       email: null,
@@ -195,13 +175,6 @@ async function setupMocks(
   // Categories — registered AFTER catch-all so specific ones fire first (LIFO)
   await page.route('**/api/v1/categories**', (route) => {
     const url = route.request().url();
-    if (url.includes('STAFF_DEPARTMENT')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_DEPARTMENTS),
-      });
-    }
     if (url.includes('STAFF_POSITION')) {
       return route.fulfill({
         status: 200,
@@ -270,12 +243,14 @@ test.describe('Nhân sự page (offline-friendly)', () => {
     await expect(searchInput).toBeVisible({ timeout: 8000 });
   });
 
-  test('7. department filter dropdown opens', async ({ page }) => {
+  test('7. position filter dropdown opens', async ({ page }) => {
     await gotoNhanSuAsAdmin(page);
-    const trigger = page.getByLabel('Lọc bộ phận');
+    const trigger = page.getByLabel('Lọc chức vụ');
     await expect(trigger).toBeVisible({ timeout: 8000 });
     await trigger.click();
-    await expect(page.getByRole('option', { name: 'Buồng phòng' })).toBeVisible({ timeout: 4000 });
+    await expect(page.getByRole('option', { name: 'Quản lý cơ sở' })).toBeVisible({
+      timeout: 4000,
+    });
   });
 
   test('8. "Thêm nhân sự" button is visible for ADMIN', async ({ page }) => {

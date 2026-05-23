@@ -13,7 +13,6 @@ export type CategoryGroup =
   | 'UNIT'
   | 'SERVICE_GROUP'
   | 'SURCHARGE_TYPE'
-  | 'STAFF_DEPARTMENT'
   | 'STAFF_POSITION'
   | 'PAYROLL_STATUS';
 
@@ -32,7 +31,6 @@ export const CATEGORY_GROUP_LABEL: Record<CategoryGroup, string> = {
   UNIT: 'Đơn vị',
   SERVICE_GROUP: 'Nhóm dịch vụ',
   SURCHARGE_TYPE: 'Loại phụ thu',
-  STAFF_DEPARTMENT: 'Bộ phận nhân sự',
   STAFF_POSITION: 'Chức vụ nhân sự',
   PAYROLL_STATUS: 'Trạng thái bảng lương',
 };

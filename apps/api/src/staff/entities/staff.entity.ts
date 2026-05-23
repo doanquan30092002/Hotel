@@ -6,7 +6,6 @@ type StaffRow = {
   id: string;
   code: string;
   fullName: string;
-  department: CategoryRef | null;
   position: CategoryRef | null;
   phone: string | null;
   email: string | null;
@@ -25,7 +24,6 @@ export class StaffEntity {
   @ApiProperty() id!: string;
   @ApiProperty() code!: string;
   @ApiProperty() fullName!: string;
-  @ApiPropertyOptional() department!: CategoryRef | null;
   @ApiPropertyOptional() position!: CategoryRef | null;
   @ApiPropertyOptional() phone!: string | null;
   @ApiPropertyOptional() email!: string | null;
@@ -44,7 +42,6 @@ export class StaffEntity {
     e.id = s.id;
     e.code = s.code;
     e.fullName = s.fullName;
-    e.department = s.department;
     e.position = s.position;
     e.phone = s.phone;
     e.email = s.email;

@@ -25,7 +25,6 @@ const PAYROLL_INCLUDE = {
       code: true,
       fullName: true,
       avatarUrl: true,
-      department: { select: { id: true, code: true, name: true } },
       position: { select: { id: true, code: true, name: true } },
     },
   },

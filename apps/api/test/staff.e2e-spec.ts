@@ -13,8 +13,7 @@ describe('Staff (e2e)', () => {
   let receptionistToken: string;
 
   // Category IDs resolved at setup
-  let departmentReceptionId: string;
-  let departmentManagementId: string;
+  let positionHousekeeperId: string;
   let positionManagerId: string;
   let positionReceptionistId: string;
   let wrongGroupId: string; // ROOM_TYPE — to test wrong group
@@ -48,10 +47,9 @@ describe('Staff (e2e)', () => {
       return cat.id;
     };
 
-    departmentReceptionId = await getCatId('STAFF_DEPARTMENT', 'reception');
-    departmentManagementId = await getCatId('STAFF_DEPARTMENT', 'management');
     positionManagerId = await getCatId('STAFF_POSITION', 'manager');
     positionReceptionistId = await getCatId('STAFF_POSITION', 'receptionist');
+    positionHousekeeperId = await getCatId('STAFF_POSITION', 'housekeeper');
     wrongGroupId = await getCatId('ROOM_TYPE', 'single');
 
     // Login as admin
@@ -108,7 +106,6 @@ describe('Staff (e2e)', () => {
   function buildCreatePayload(overrides: Record<string, unknown> = {}) {
     return {
       fullName: 'Test Staff Member',
-      departmentId: departmentReceptionId,
       positionId: positionReceptionistId,
       phone: '0900099999',
       joinDate: '2026-01-01',
@@ -188,15 +185,15 @@ describe('Staff (e2e)', () => {
 
   // ── FILTER ────────────────────────────────────────────────────────────────────
 
-  it('GET /staff?departmentId=<reception> — returns only reception staff', async () => {
+  it('GET /staff?positionId=<receptionist> — returns only receptionist position staff', async () => {
     const res = await request(app.getHttpServer())
-      .get(`/api/v1/staff?departmentId=${departmentReceptionId}`)
+      .get(`/api/v1/staff?positionId=${positionReceptionistId}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     expect(res.body.meta.total).toBeGreaterThanOrEqual(2); // NS002, NS006
-    for (const s of res.body.data as { department: { id: string } }[]) {
-      expect(s.department.id).toBe(departmentReceptionId);
+    for (const s of res.body.data as { position: { id: string } }[]) {
+      expect(s.position.id).toBe(positionReceptionistId);
     }
   });
 
@@ -206,7 +203,7 @@ describe('Staff (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
-    expect(res.body.meta.total).toBeGreaterThanOrEqual(2); // NS001, NS003
+    expect(res.body.meta.total).toBeGreaterThanOrEqual(1); // NS001 (after seed removed dept)
     for (const s of res.body.data as { position: { id: string } }[]) {
       expect(s.position.id).toBe(positionManagerId);
     }
@@ -274,7 +271,6 @@ describe('Staff (e2e)', () => {
 
     expect(res.body.data.code).toBe('NS001');
     expect(res.body.data.fullName).toBe('Nguyễn Hiền An');
-    expect(res.body.data.department).toBeDefined();
     expect(res.body.data.position).toBeDefined();
     expect(res.body.data.baseSalary).toBe('12000000');
     expect(res.body.data.allowance).toBe('1500000');
@@ -299,7 +295,6 @@ describe('Staff (e2e)', () => {
 
     expect(res.body.data.code).toMatch(/^NS\d{3}$/);
     expect(res.body.data.fullName).toBe('E2E New Staff');
-    expect(res.body.data.department).toBeDefined();
     expect(res.body.data.position).toBeDefined();
     expect(res.body.data.joinDate).toBe('2026-01-01');
     expect(res.body.data.baseSalary).toBe('7000000');
@@ -350,14 +345,6 @@ describe('Staff (e2e)', () => {
       .expect(400);
   });
 
-  it('POST /staff — departmentId must be STAFF_DEPARTMENT group returns 400', async () => {
-    await request(app.getHttpServer())
-      .post('/api/v1/staff')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send(buildCreatePayload({ departmentId: wrongGroupId }))
-      .expect(400);
-  });
-
   it('POST /staff — positionId must be STAFF_POSITION group returns 400', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/staff')
@@ -384,16 +371,16 @@ describe('Staff (e2e)', () => {
     expect(res.body.data.shiftType).toBe('night');
   });
 
-  it('PATCH /staff/:id — can update departmentId to management', async () => {
+  it('PATCH /staff/:id — can update positionId to housekeeper', async () => {
     expect(createdStaffId).toBeDefined();
 
     const res = await request(app.getHttpServer())
       .patch(`/api/v1/staff/${createdStaffId}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ departmentId: departmentManagementId })
+      .send({ positionId: positionHousekeeperId })
       .expect(200);
 
-    expect(res.body.data.department.id).toBe(departmentManagementId);
+    expect(res.body.data.position.id).toBe(positionHousekeeperId);
   });
 
   it('PATCH /staff/:id — non-existent returns 404', async () => {

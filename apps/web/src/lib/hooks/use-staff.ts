@@ -26,7 +26,6 @@ export function useStaffs(params: StaffListQuery = {}) {
         page: params.page ?? 1,
         pageSize: params.pageSize ?? 10,
       };
-      if (params.departmentId) query['departmentId'] = params.departmentId;
       if (params.positionId) query['positionId'] = params.positionId;
       if (params.active !== undefined) query['active'] = params.active;
       if (params.keyword) query['keyword'] = params.keyword;

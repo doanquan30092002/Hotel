@@ -9,7 +9,6 @@ export interface Payroll {
     code: string;
     fullName: string;
     avatarUrl: string | null;
-    department: { id: string; code: string; name: string } | null;
     position: { id: string; code: string; name: string } | null;
   };
   workingDays: number;

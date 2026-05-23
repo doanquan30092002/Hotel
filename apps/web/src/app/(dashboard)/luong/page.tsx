@@ -288,7 +288,7 @@ function TableView({
               Nhân sự
             </th>
             <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Bộ phận
+              Chức vụ
             </th>
             <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
               Ngày công
@@ -378,8 +378,8 @@ function TableView({
                   <div className="text-xs text-muted-foreground font-mono">{p.staff.code}</div>
                 </td>
 
-                {/* Bộ phận */}
-                <td className="px-3 py-3 text-sm">{p.staff.department?.name ?? '—'}</td>
+                {/* Chức vụ */}
+                <td className="px-3 py-3 text-sm">{p.staff.position?.name ?? '—'}</td>
 
                 {/* Ngày công */}
                 <td className="px-3 py-3 text-sm text-right">{p.workingDays}</td>
