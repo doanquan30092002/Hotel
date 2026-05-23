@@ -19,6 +19,7 @@ import { HousekeepingModule } from './housekeeping/housekeeping.module';
 import { FinanceModule } from './finance/finance.module';
 import { StaffModule } from './staff/staff.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
@@ -45,6 +46,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     FinanceModule,
     StaffModule,
     PayrollModule,
+    UploadsModule,
   ],
   controllers: [HealthController],
   providers: [

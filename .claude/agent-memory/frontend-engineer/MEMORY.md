@@ -702,3 +702,91 @@ function PageContent({ canManage }: { canManage: boolean }) {
 ```
 
 This avoids the ESLint `react-hooks/rules-of-hooks` error from conditional early return before hooks.
+
+## Phase 12 patterns (Uploads / Tệp upload)
+
+### Separate stats hook
+
+- `useUploadStats()` calls `GET /uploads/stats` as its own dedicated hook with `UPLOAD_KEYS.stats()` query key — NOT part of the list query. This allows independent refetch (Làm mới button calls both `refetch()` from useUploads and `refetchStats()` from useUploadStats).
+- Stats shape: `{ total: number, byKind: { ROOM_IMAGE, GUEST_DOC, STAFF_AVATAR, OTHER } }`.
+
+### Thumbnail cell with next/image unoptimized
+
+```tsx
+function ThumbnailCell({ upload }: { upload: Upload }) {
+  const isImage = upload.mimeType.startsWith('image/');
+  if (isImage) {
+    return (
+      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+        <Image
+          src={upload.url}
+          alt={upload.fileName}
+          fill
+          className="object-cover"
+          unoptimized // Required for external/relative URLs from BE
+          sizes="40px"
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+      <FileIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+    </div>
+  );
+}
+```
+
+Use `unoptimized` on `next/image` when BE returns paths like `/uploads/...` (relative or external URL not in `next.config` `domains`).
+
+### Generic entityType/entityId display (MVP — no join)
+
+- MVP: display `"{entityType} — {entityId.slice(0,12)}…"` or `"—"` when both null.
+- No extra API call to resolve room/customer name. Joining entities deferred to a future phase.
+- Pattern: `const entityDisplay = entityType && entityId ? \`${entityType} — ${entityId.slice(0,12)}…\` : entityType ?? '—'`.
+
+### Kind badge palette (Upload)
+
+```tsx
+const KIND_CONFIG: Record<UploadKind, { label: string; className: string }> = {
+  ROOM_IMAGE: { label: 'Ảnh phòng', className: 'bg-emerald-100 text-emerald-700 border-0' },
+  GUEST_DOC: { label: 'Hình tham khảo', className: 'bg-sky-100 text-sky-700 border-0' },
+  STAFF_AVATAR: { label: 'Avatar', className: 'bg-amber-100 text-amber-700 border-0' },
+  OTHER: { label: 'Khác', className: 'bg-zinc-100 text-zinc-700 border-0' },
+};
+```
+
+### Playwright route mock for stats sub-endpoint + list catch-all
+
+Since `stats` is a sub-path of `uploads`, handle in a single route handler with URL check (LIFO not needed when using a single handler):
+
+```ts
+await page.route('**/api/v1/uploads**', (route) => {
+  const url = route.request().url();
+  if (url.includes('/uploads/stats')) {
+    return route.fulfill({ status: 200, body: JSON.stringify(MOCK_STATS) });
+  }
+  return route.fulfill({ status: 200, body: JSON.stringify(MOCK_UPLOADS_LIST) });
+});
+```
+
+### File size display helper (inline)
+
+```ts
+function formatFileSize(bytes: number): string {
+  if (bytes <= 0) return '—';
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+```
+
+Show below fileName as secondary text (text-xs text-muted-foreground). No separate column.
+
+### Test locator fix — fileName instead of code
+
+The Uploads table does NOT render `upload.code` ("TU001") — it renders `upload.fileName`. Playwright test 3 should assert fileName visibility, not code:
+
+```ts
+// WRONG: page.getByText('TU001') — code not rendered in table
+// CORRECT: page.getByText('Homestay_nha_anh_phng_phm_20260500094034.png').first()
+```

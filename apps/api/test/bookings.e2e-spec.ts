@@ -44,9 +44,29 @@ describe('Bookings (e2e)', () => {
 
     prisma = app.get(PrismaService);
 
-    // Clean up e2e bookings from previous runs
-    await prisma.booking.deleteMany({ where: { code: { startsWith: 'TEST_' } } });
-    await prisma.customer.deleteMany({ where: { code: { endsWith: '_bke2e' } } });
+    // Clean up e2e bookings from previous runs (any auto-created bookings beyond seed)
+    await prisma.booking.deleteMany({
+      where: { code: { notIn: ['BK001', 'BK002', 'BK003'] } },
+    });
+    // Clean up auto-created customers from prior test runs (resolveCustomer auto-creates KH###)
+    await prisma.customer.deleteMany({
+      where: {
+        code: {
+          notIn: [
+            'KH001',
+            'KH002',
+            'KH003',
+            'KH004',
+            'KH005',
+            'KH006',
+            'KH007',
+            'KH008',
+            'KH009',
+            'KH010',
+          ],
+        },
+      },
+    });
 
     // Resolve category IDs
     const getCatId = async (group: string, code: string) => {
@@ -136,9 +156,28 @@ describe('Bookings (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Clean up e2e fixtures
-    await prisma.booking.deleteMany({ where: { code: { startsWith: 'TEST_' } } });
-    await prisma.customer.deleteMany({ where: { code: { endsWith: '_bke2e' } } });
+    // Clean up e2e fixtures — keep only seed bookings/customers
+    await prisma.booking.deleteMany({
+      where: { code: { notIn: ['BK001', 'BK002', 'BK003'] } },
+    });
+    await prisma.customer.deleteMany({
+      where: {
+        code: {
+          notIn: [
+            'KH001',
+            'KH002',
+            'KH003',
+            'KH004',
+            'KH005',
+            'KH006',
+            'KH007',
+            'KH008',
+            'KH009',
+            'KH010',
+          ],
+        },
+      },
+    });
     await prisma.user.deleteMany({
       where: {
         email: {

@@ -39,6 +39,7 @@ model User {
   auditLogs                   AuditLog[]
   housekeepingTasksAsAssignee HousekeepingTask[] @relation("HousekeepingAssignee")
   financeTxsCreated           FinanceTx[]        @relation("FinanceTxCreatedBy")
+  uploads                     Upload[]           @relation("UploadUploadedBy")
 
   @@index([role, status])
 }
@@ -418,6 +419,37 @@ model Payroll {
   @@unique([staffId, month])
   @@index([statusId])
   @@index([month])
+  @@index([deletedAt])
+}
+
+enum UploadKind {
+  ROOM_IMAGE
+  GUEST_DOC
+  STAFF_AVATAR
+  OTHER
+}
+
+model Upload {
+  id            String     @id @default(cuid())
+  code          String     @unique           // TU001..
+  kind          UploadKind
+  entityType    String?                       // "room" | "customer" | "staff" | null
+  entityId      String?                       // generic FK (no DB-level constraint)
+  fileName      String                        // original file name
+  fileSize      Int        @default(0)        // bytes
+  mimeType      String     @default("application/octet-stream")
+  url           String                        // public URL or storage path
+  fileId        String?                       // storage system ID (e.g. S3 key, hash)
+  note          String?
+  uploadedById  String?
+  uploadedBy    User?      @relation("UploadUploadedBy", fields: [uploadedById], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  @@index([kind])
+  @@index([entityType, entityId])
+  @@index([uploadedById])
   @@index([deletedAt])
 }
 

@@ -713,6 +713,73 @@ active?: boolean;
 
 This handles URL query params like `?active=true` which arrive as strings.
 
+## Patterns added in Phase 12
+
+### Generic polymorphic ref (no DB FK) — entityType / entityId
+
+When a model needs a loose association to multiple entity types without a DB-level foreign key
+constraint, use two plain `String?` fields: `entityType` and `entityId`.
+
+```prisma
+model Upload {
+  entityType  String?  // "room" | "customer" | "staff" | null  (no @relation)
+  entityId    String?  // CUID of the referenced row             (no @relation)
+  @@index([entityType, entityId])
+}
+```
+
+- Query with `where: { entityType: 'room', entityId: roomId }`.
+- No cascade delete — the Upload row is orphaned if the room is deleted (acceptable for a file registry).
+- Seed: resolve entity IDs at runtime with `prisma.<model>.findUnique({ where: { code } })`.
+
+### Stats endpoint — `groupBy` pattern
+
+```ts
+async getStats() {
+  const counts = await this.prisma.upload.groupBy({
+    by: ['kind'],
+    where: { deletedAt: null },
+    _count: { _all: true },
+  });
+
+  // Pre-fill all enum values with 0
+  const byKind = Object.fromEntries(Object.values(UploadKind).map((k) => [k, 0]));
+  for (const c of counts) byKind[c.kind] = c._count._all;
+
+  const total = Object.values(byKind).reduce((a, b) => a + b, 0);
+  return { total, byKind };
+}
+```
+
+Route: `GET /uploads/stats` — must be declared BEFORE `GET /uploads/:id` in the controller
+to prevent NestJS from treating "stats" as an ID parameter.
+
+### Upload code format
+
+Prefix `TU###` (TU001, TU002, ...). Same `nextCode()` collision-fallback pattern as NS### / BL###.
+
+### RBAC split for uploads
+
+| Endpoint              | Roles                                                      |
+| --------------------- | ---------------------------------------------------------- |
+| GET list / stats / id | ALL (ADMIN/MANAGER/RECEPTIONIST/HOUSEKEEPING)              |
+| POST create           | ADMIN / MANAGER / RECEPTIONIST (no file upload, URL known) |
+| PATCH update metadata | ADMIN / MANAGER only                                       |
+| DELETE (soft)         | ADMIN / MANAGER only                                       |
+
+### User relation named "UploadUploadedBy"
+
+Since `User` already had multiple named relations (HousekeepingAssignee, FinanceTxCreatedBy), add
+the inverse relation name explicitly on both sides:
+
+```prisma
+// Upload model:
+uploadedBy  User?  @relation("UploadUploadedBy", fields: [uploadedById], references: [id])
+
+// User model (inverse):
+uploads  Upload[]  @relation("UploadUploadedBy")
+```
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

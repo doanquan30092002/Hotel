@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-24
-**Current phase**: Phase 11 — Staff + Payroll BE ✓ (433/433 e2e, lint 0w, typecheck 0e)
+**Current phase**: Phase 12 — Uploads BE ✓ (464/464 e2e, lint 0w, typecheck 0e) + FE ✓ (145/145 Playwright)
 **Active branch**: `master`
 
 ## Phase status
@@ -75,17 +75,32 @@
 - [x] **9. Housekeeping (Dọn phòng)** (BE complete — 312 e2e total, lint 0w, typecheck 0e; FE complete — 101/101 Playwright, lint 0w, typecheck 0e)
 - [x] **10. Finance (Thu chi)** (BE complete — 362 e2e total, lint 0w, typecheck 0e; FE complete — 115/115 Playwright, lint 0w, typecheck 0e)
 - [x] **11. Staff + Payroll** (BE complete — 433 e2e total, lint 0w, typecheck 0e; FE complete — 135/135 Playwright, lint 0w, typecheck 0e)
-- [ ] 12. Uploads (Tệp upload)
+- [x] **12. Uploads (Tệp upload)** (BE complete — 464 e2e total, lint 0w, typecheck 0e; FE complete — 145/145 Playwright, lint 0w, typecheck 0e)
 - [ ] 13. Dashboard
 - [ ] 14. Báo cáo & xuất file
 - [ ] 15. Polish + deploy
 
 ## Currently working on
 
-- **Status**: Phase 11 (Staff + Payroll) HOÀN TẤT — BE 433/433 e2e + FE 135/135 Playwright, lint 0w / typecheck 0e.
+- **Status**: Phase 12 (Uploads) HOÀN TẤT — BE 464/464 e2e (31 mới) + FE 145/145 Playwright, lint 0w / typecheck 0e.
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 11 FE result**: Nhân sự page + Bảng lương page + 20 new Playwright tests (10 nhan-su + 10 luong).
-- **Next**: Phase 12 — Uploads (Tệp upload).
+- **Phase 12 BE result**: Upload model + UploadKind enum + migration 10_uploads + seedUploads() (10 rows TU001..TU010) + UploadsModule (6 endpoints: list/stats/get/create/patch/delete) + 31 e2e tests.
+- **Next**: Phase 13 — Dashboard.
+
+### Phase 12 — files (BE)
+
+- `apps/api/prisma/schema.prisma` — `UploadKind` enum + `Upload` model + inverse relation `uploads Upload[] @relation("UploadUploadedBy")` on `User`
+- `apps/api/prisma/migrations/20260523182553_10_uploads/migration.sql`
+- `apps/api/prisma/seed.ts` — `UploadKind` import + `seedUploads()` (TU001..TU010 ROOM_IMAGE linked to 10 rooms) + call in `main()`
+- `apps/api/src/uploads/uploads.module.ts`
+- `apps/api/src/uploads/uploads.service.ts` — `nextCode()` (TU###), `list()`, `findOne()`, `getStats()` (groupBy pattern), `create()` (uploadedById=currentUser), `update()`, `remove()` (soft-delete)
+- `apps/api/src/uploads/uploads.controller.ts` — 6 endpoints: GET list, GET /stats (before /:id!), GET /:id, POST, PATCH /:id, DELETE /:id; RBAC: GET=all, POST=ADMIN/MANAGER/RECEPTIONIST, PATCH/DELETE=ADMIN/MANAGER
+- `apps/api/src/uploads/dto/create-upload.dto.ts`
+- `apps/api/src/uploads/dto/update-upload.dto.ts` — PartialType
+- `apps/api/src/uploads/dto/query-upload.dto.ts` — extends PageQueryDto + kind/entityType/entityId/keyword
+- `apps/api/src/uploads/entities/upload.entity.ts` — `UploadEntity.from()` nests `uploadedBy: {id, fullName, role}`
+- `apps/api/src/app.module.ts` — registered UploadsModule
+- `apps/api/test/uploads.e2e-spec.ts` — 31 tests (464 total)
 
 ### Phase 11 — files (FE)
 

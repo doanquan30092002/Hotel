@@ -15,6 +15,7 @@ import {
   FinanceTxType,
   Prisma,
   PrismaClient,
+  UploadKind,
   UserRole,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -1584,6 +1585,111 @@ async function seedPayrolls(): Promise<void> {
   console.log(`Seed payrolls: ${PAYROLL_SEEDS.length} rows upserted`);
 }
 
+// ── Uploads seed ──────────────────────────────────────────────────────────────
+
+async function seedUploads(): Promise<void> {
+  // Resolve admin user for uploadedBy
+  const adminUser = await prisma.user.findFirstOrThrow({
+    where: { email: process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local', deletedAt: null },
+    select: { id: true },
+  });
+
+  // Rooms to attach ROOM_IMAGE uploads to (all 10 seeded rooms)
+  const roomCodes = [
+    'P101',
+    'P102',
+    'P201',
+    'P202',
+    'P301',
+    'P302',
+    'B101',
+    'B102',
+    'V101',
+    'V102',
+  ];
+
+  interface UploadSeed {
+    code: string;
+    kind: UploadKind;
+    entityType: string;
+    roomCode: string;
+    suffix: string;
+    fileSize: number;
+    fileIdSuffix: string;
+  }
+
+  const fileSizes = [
+    234567, 312000, 189500, 421300, 158900, 276400, 398200, 143600, 505000, 267800,
+  ];
+  const fileIdSuffixes = [
+    'abc12345',
+    'bcd23456',
+    'cde34567',
+    'def45678',
+    'efg56789',
+    'fgh67890',
+    'ghi78901',
+    'hij89012',
+    'ijk90123',
+    'jkl01234',
+  ];
+
+  const UPLOAD_SEEDS: UploadSeed[] = roomCodes.map((roomCode, i) => ({
+    code: `TU${String(i + 1).padStart(3, '0')}`,
+    kind: UploadKind.ROOM_IMAGE,
+    entityType: 'room',
+    roomCode,
+    suffix: `${i + 1}`,
+    fileSize: fileSizes[i] ?? 250000,
+    fileIdSuffix: fileIdSuffixes[i] ?? `xxx${i}`,
+  }));
+
+  for (const seed of UPLOAD_SEEDS) {
+    // Resolve the actual room record for entityId
+    const room = await prisma.room.findUnique({
+      where: { code: seed.roomCode },
+      select: { id: true },
+    });
+
+    if (!room) {
+      console.warn(`  seedUploads: room ${seed.roomCode} not found, skipping ${seed.code}`);
+      continue;
+    }
+
+    const fileName = `Homestay-room-${seed.roomCode}-${seed.suffix}.png`;
+
+    await prisma.upload.upsert({
+      where: { code: seed.code },
+      update: {
+        kind: seed.kind,
+        entityType: seed.entityType,
+        entityId: room.id,
+        fileName,
+        fileSize: seed.fileSize,
+        mimeType: 'image/png',
+        url: `/uploads/rooms/${seed.roomCode}.png`,
+        fileId: `upload_${seed.roomCode}_${seed.fileIdSuffix}`,
+        uploadedById: adminUser.id,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        kind: seed.kind,
+        entityType: seed.entityType,
+        entityId: room.id,
+        fileName,
+        fileSize: seed.fileSize,
+        mimeType: 'image/png',
+        url: `/uploads/rooms/${seed.roomCode}.png`,
+        fileId: `upload_${seed.roomCode}_${seed.fileIdSuffix}`,
+        uploadedById: adminUser.id,
+      },
+    });
+  }
+
+  console.log(`Seed uploads: ${UPLOAD_SEEDS.length} rows upserted`);
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -1623,6 +1729,7 @@ async function main() {
   await seedFinanceTxs();
   await seedStaffs();
   await seedPayrolls();
+  await seedUploads();
 
   console.log(`Seed done. Admin: ${adminEmail} / ${adminPassword}`);
 }
