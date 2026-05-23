@@ -21,6 +21,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { ChangeCleaningDto } from './dto/change-cleaning.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { QueryAvailableRoomDto } from './dto/query-available-room.dto';
 import { QueryRoomDto } from './dto/query-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomEntity } from './entities/room.entity';
@@ -42,6 +43,15 @@ export class RoomsController {
   @ApiResponse({ status: 200, description: 'Danh sách phòng' })
   async findAll(@Query() query: QueryRoomDto) {
     return this.roomsService.list(query);
+  }
+
+  @Get('available')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Danh sách phòng còn trống trong khoảng ngày' })
+  @ApiResponse({ status: 200, description: 'Danh sách phòng trống + thống kê' })
+  @ApiResponse({ status: 422, description: 'checkOut phải sau checkIn' })
+  async listAvailable(@Query() query: QueryAvailableRoomDto) {
+    return this.roomsService.listAvailable(query);
   }
 
   @Get(':id')

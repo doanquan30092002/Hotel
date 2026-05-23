@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-23
-**Current phase**: Phase 7 — Calendar booking FE ✓ (80/80 Playwright, lint 0w, typecheck 0e)
+**Current phase**: Phase 8 — Tìm phòng trống FE ✓ (90/90 Playwright, lint 0w, typecheck 0e)
 **Active branch**: `master`
 
 ## Phase status
@@ -71,7 +71,7 @@
   - [x] Code-reviewer gate: PASS (0 Critical, 0 Major, 0 nit — self-review do subagent hit rate limit; verified anti-overlap, totals computation, customer resolver priority, RBAC split, pagination MANDATORY, status palette).
 - [x] **7. Calendar booking** (FE complete — 80/80 Playwright; BE in parallel)
   - [x] BE: `GET /api/v1/calendar?from&to&view&typeId&statusId&sourceId&keyword` — read-only endpoint, no new models, 25/25 e2e PASS (258 total)
-- [ ] 8. Tìm phòng trống nhanh
+- [x] **8. Tìm phòng trống nhanh** (BE complete — 271 e2e total; FE complete — 90/90 Playwright, lint 0w, typecheck 0e)
 - [ ] 9. Housekeeping
 - [ ] 10. Finance (Thu chi)
 - [ ] 11. Staff + Payroll
@@ -82,10 +82,25 @@
 
 ## Currently working on
 
-- **Status**: Phase 7 (Calendar booking) HOÀN TẤT — BE 258/258 e2e, FE 80/80 Playwright, lint 0w / typecheck 0e cả 2 workspace.
+- **Status**: Phase 8 (Tìm phòng trống nhanh) HOÀN TẤT — BE 271/271 e2e + FE 90/90 Playwright, lint 0w / typecheck 0e.
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 7 result**: BE `GET /api/v1/calendar` endpoint (25 e2e). FE `/lich` page với month/week/day grid, absolute-positioned booking bars, view switcher, KPI row, status legend, filter bar (11 Playwright).
-- **Next phase prep (Phase 8 — Tìm phòng trống nhanh)**: Template `7_15_24`. Endpoint `GET /api/v1/rooms/available?checkIn&checkOut&typeId&areaId&capacity`. FE: trang `/phong-trong`.
+- **Phase 8 BE result**: `GET /api/v1/rooms/available` endpoint added to existing RoomsController. No new models/migration. Anti-overlap formula reused from BookingsService (cancelled + checked_out statuses are non-blocking). Filters: typeId, capacity (gte), keyword. Meta: totalRooms, totalAvailable, totalBooked.
+- **Phase 8 FE result**: Hook `useAvailableRooms` + page `/phong-trong` with filter bar + KPI row + responsive room card grid + `BookingFormDialog` extended with `initialValues` prop. 10 new Playwright tests.
+- **Next**: Phase 9 — Housekeeping (Dọn phòng).
+
+### Phase 8 — files (FE)
+
+- `apps/web/src/lib/hooks/use-available-rooms.ts` — `AVAILABLE_KEYS` + `useAvailableRooms(params, enabled)` hook (staleTime 30s)
+- `apps/web/src/app/(dashboard)/phong-trong/page.tsx` — full implementation: filter bar (checkIn/checkOut/capacity/typeId) + KPI 4 cards + responsive room card grid (1→2→3→4 col) + booking dialog integration
+- `apps/web/tests/phong-trong.spec.ts` — 10 offline Playwright tests
+- `apps/web/src/app/(dashboard)/booking/booking-form-dialog.tsx` — extended with `BookingFormInitialValues` export + `initialValues?` prop (non-breaking, seeds create-mode checkIn/checkOut/items)
+
+### Phase 8 — files (BE)
+
+- `apps/api/src/rooms/dto/query-available-room.dto.ts` — QueryAvailableRoomDto (checkIn/checkOut ISO8601, optional typeId/capacity/keyword)
+- `apps/api/src/rooms/rooms.service.ts` — added `listAvailable()` method with anti-overlap query
+- `apps/api/src/rooms/rooms.controller.ts` — added `GET available` endpoint BEFORE `GET :id` to avoid route collision
+- `apps/api/test/rooms-available.e2e-spec.ts` — 13 tests covering auth/valid-range/no-overlap/BK001-blocks/typeId/capacity/keyword/422/400/cancelled-non-blocking/meta
 
 ### Phase 7 — files (FE)
 

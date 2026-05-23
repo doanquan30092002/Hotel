@@ -374,6 +374,83 @@ export enum CalendarView {
 
 Always verify actual seed data for e2e tests. KH006 = "Hoàng Gia Linh" (not "Trần Thị Mai"). When writing tests based on seeded data, cross-check `prisma/seed.ts` for exact field values.
 
+## Patterns added in Phase 8
+
+### Blocked-rooms-in-range query (available rooms endpoint)
+
+Reusable pattern to find rooms that are NOT booked in a date range:
+
+```ts
+// 1. Fetch non-blocking status IDs dynamically
+const nonBlockingStatuses = await prisma.category.findMany({
+  where: {
+    group: CategoryGroup.BOOKING_STATUS,
+    code: { in: ['cancelled', 'checked_out'] },
+    deletedAt: null,
+  },
+  select: { id: true },
+});
+const nonBlockingIds = nonBlockingStatuses.map((s) => s.id);
+
+// 2. Find all blocking bookings overlapping [checkIn, checkOut)
+const blockingBookings = await prisma.booking.findMany({
+  where: {
+    deletedAt: null,
+    statusId: { notIn: nonBlockingIds },
+    checkIn: { lt: checkOut }, // interval-overlap formula
+    checkOut: { gt: checkIn },
+  },
+  select: {
+    items: {
+      where: { kind: BookingItemKind.ROOM, roomId: { not: null } },
+      select: { roomId: true },
+    },
+  },
+});
+
+// 3. Build blocked room ID set
+const blockedRoomIds = new Set<string>();
+for (const booking of blockingBookings) {
+  for (const item of booking.items) {
+    if (item.roomId !== null) blockedRoomIds.add(item.roomId);
+  }
+}
+
+// 4. Filter available rooms
+const availableRooms = allRooms.filter((r) => !blockedRoomIds.has(r.id));
+```
+
+This differs from `assertNoRoomOverlap()` (Phase 6) which checks one room at a time. This bulk approach queries all blocking bookings once then does an in-memory Set filter — O(B×I + R) vs O(R×B×I).
+
+### capacity ≥ N filter in Prisma
+
+```ts
+...(query.capacity !== undefined ? { capacity: { gte: query.capacity } } : {}),
+```
+
+Use `gte` (not `eq`) for minimum capacity filter — callers want rooms that can hold at least N guests.
+
+### Route ordering: GET 'available' must precede GET ':id'
+
+When adding a named sub-route like `GET rooms/available` to an existing controller that already has `GET rooms/:id`, the named route MUST be declared first in the controller. NestJS matches routes in declaration order, so if `:id` comes first it will capture the string "available" as an ID parameter.
+
+### Custom meta shape for non-paginated list endpoints
+
+When the endpoint returns ALL matching items (no pagination), use a custom meta instead of the standard `{ page, pageSize, total, totalPages }`:
+
+```ts
+return {
+  data: availableRooms.map(RoomEntity.from),
+  meta: {
+    checkIn: query.checkIn,
+    checkOut: query.checkOut,
+    totalRooms: allRooms.length,
+    totalAvailable: availableRooms.length,
+    totalBooked: bookedCount,
+  },
+};
+```
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.

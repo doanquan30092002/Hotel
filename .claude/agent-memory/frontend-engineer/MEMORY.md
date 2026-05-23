@@ -337,6 +337,54 @@ Reset `page = 1` khi: pageSize đổi, keyword đổi (debounce), filter đổi.
 
 - Avoid `getByText('2')` — it matches any element with text containing "2" (Tone 2 in theme switcher, month numbers, etc.). Use specific text like `getByText('81%')` or `getByText('Công suất ước tính')` instead.
 
+## Phase 8 patterns (Tìm phòng trống nhanh)
+
+### Date-range filter bar pattern
+
+- Filter bar in a `<Card className="p-4">` with `flex flex-wrap items-end gap-3`.
+- Date inputs: `<Input type="date">` with `aria-label` for Playwright accessibility.
+- Capacity/type selects: use `__all__` as the "all" select value — NEVER use empty string `""` as `SelectItem value`. Radix Select throws `A <Select.Item /> must have a value prop that is not an empty string`.
+- Initial state for selects: `useState('__all__')`. Translate `'__all__'` → `undefined` before building query params.
+- Submit button fires `handleSearch()` which copies state to `submitted` object (TanStack Query key). This decouples filter inputs from API calls — no request until user clicks Search.
+
+### useAvailableRooms hook
+
+- File: `lib/hooks/use-available-rooms.ts`.
+- `AVAILABLE_KEYS = { all: ['rooms-available'], list: (params) => ['rooms-available', 'list', params] }`.
+- Accepts `(params: AvailableRoomsQuery, enabled: boolean)`. `enabled` gate prevents spurious requests.
+- Returns `{ data: Room[], meta: AvailableRoomsMeta }` where meta includes `{ totalRooms, totalAvailable, totalBooked, checkIn, checkOut }`.
+
+### KPI row from BE meta
+
+- Four KPI cards in `grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4`.
+- Values from `query.data?.meta`: `totalAvailable`, `totalBooked`, derived `Math.max(0, totalRooms - totalAvailable - totalBooked)` for "other", `totalRooms`.
+- While loading: `<Skeleton className="h-9 w-16 mt-1" />` inside each card.
+- Cards show `?? 0` as fallback when data is undefined.
+
+### Room card grid
+
+- `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4` for 1→2→3→4 responsive.
+- Each card: `Card className="overflow-hidden"` + `div relative h-36 w-full bg-muted` (image or BedDouble icon placeholder) + `div p-4 space-y-1.5`.
+- `next/image` with `fill` + `object-cover` for room images. `sizes` prop for responsive image loading.
+- Placeholder: `BedDouble` icon centered in `bg-muted` div.
+
+### BookingFormDialog initialValues prop extension
+
+- Added `export type BookingFormInitialValues { checkIn?, checkOut?, items? }`.
+- Added `initialValues?: BookingFormInitialValues` to `BookingFormDialogProps`.
+- In create-mode reset block: use `initialValues?.checkIn ?? todayIso()` etc.
+- Added `initialValues` to the `useEffect` dependency array.
+- `items` type in `BookingFormInitialValues` is `BookingFormData['items']` — requires `BookingFormData` to be exported (`export type BookingFormData = z.infer<typeof bookingSchema>`).
+- Pre-filling items for "Tạo booking" from room card: compute `nights = max(1, round((checkOut-checkIn)/86400000))`, then seed `items: [{ kind: 'ROOM', roomId, refCode, refName, quantity: nights, unitPrice: basePrice }]`.
+
+### Playwright route mock ordering for specific vs catch-all
+
+- Playwright routes use LIFO (last-in, first-out): the LAST `page.route()` registered fires FIRST.
+- Pattern for specific endpoint + catch-all:
+  1. Register catch-all `**/api/v1/rooms**` FIRST (fires last, is the fallback).
+  2. Register specific `**/api/v1/rooms/available**` LAST (fires first, takes priority).
+- Without this ordering, the catch-all `rooms**` swallows all `rooms/available` requests.
+
 ## Phase 6 patterns (Bookings)
 
 - `BOOKING_KEYS` follows same shape as other keys: `['bookings']` base, `['bookings','list',params]`, `['bookings','detail',id]`.

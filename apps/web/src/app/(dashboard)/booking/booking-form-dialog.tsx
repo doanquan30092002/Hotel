@@ -119,7 +119,7 @@ const bookingSchema = z
     path: ['checkOut'],
   });
 
-type BookingFormData = z.infer<typeof bookingSchema>;
+export type BookingFormData = z.infer<typeof bookingSchema>;
 
 // ─── Kind badge helper ────────────────────────────────────────────────────────
 
@@ -148,11 +148,19 @@ function SectionHeader({ title }: { title: string }) {
 
 type Mode = 'create' | 'edit' | 'view';
 
+export type BookingFormInitialValues = {
+  checkIn?: string;
+  checkOut?: string;
+  items?: BookingFormData['items'];
+};
+
 type BookingFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: Mode;
   editTarget?: Booking | null;
+  /** Optional pre-fill values for create mode (e.g. from Tìm phòng trống page) */
+  initialValues?: BookingFormInitialValues;
 };
 
 // ─── BookingFormDialog ────────────────────────────────────────────────────────
@@ -162,6 +170,7 @@ export function BookingFormDialog({
   onOpenChange,
   mode,
   editTarget,
+  initialValues,
 }: BookingFormDialogProps) {
   const isEditing = mode === 'edit';
   const isViewing = mode === 'view';
@@ -325,8 +334,8 @@ export function BookingFormDialog({
         sourceId: '',
         priceTypeId: '',
         packageId: '',
-        checkIn: todayIso(),
-        checkOut: tomorrowIso(),
+        checkIn: initialValues?.checkIn ?? todayIso(),
+        checkOut: initialValues?.checkOut ?? tomorrowIso(),
         checkInTime: '',
         checkOutTime: '',
         adults: 1,
@@ -339,11 +348,11 @@ export function BookingFormDialog({
         idNumber: '',
         email: '',
         address: '',
-        items: [],
+        items: initialValues?.items ?? [],
         payments: [],
       });
     }
-  }, [isEditing, isViewing, mode, editTarget, detailBooking, reset]);
+  }, [isEditing, isViewing, mode, editTarget, detailBooking, initialValues, reset]);
 
   // Auto-fill customer fields when selecting existing customer
   const watchedCustomerId = watch('customerId');

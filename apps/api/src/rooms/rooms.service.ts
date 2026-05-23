@@ -3,15 +3,17 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 
-import { CategoryGroup, Prisma } from '@prisma/client';
+import { BookingItemKind, CategoryGroup, Prisma } from '@prisma/client';
 
 import { paginate } from '../common/dto/paginated.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangeCleaningDto } from './dto/change-cleaning.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { QueryAvailableRoomDto } from './dto/query-available-room.dto';
 import { QueryRoomDto } from './dto/query-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomEntity } from './entities/room.entity';
@@ -289,5 +291,89 @@ export class RoomsService {
     });
 
     return RoomEntity.from(room);
+  }
+
+  // ── Available rooms ──────────────────────────────────────────────────────────
+
+  async listAvailable(query: QueryAvailableRoomDto) {
+    const checkIn = new Date(query.checkIn);
+    const checkOut = new Date(query.checkOut);
+
+    if (checkIn >= checkOut) {
+      throw new UnprocessableEntityException('checkOut phải sau checkIn');
+    }
+
+    // Get all rooms matching optional filters
+    const allRooms = await this.prisma.room.findMany({
+      where: {
+        deletedAt: null,
+        ...(query.typeId !== undefined ? { typeId: query.typeId } : {}),
+        ...(query.capacity !== undefined ? { capacity: { gte: query.capacity } } : {}),
+        ...(query.keyword
+          ? {
+              OR: [
+                { code: { contains: query.keyword, mode: 'insensitive' } },
+                { name: { contains: query.keyword, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      include: ROOM_INCLUDE,
+      orderBy: { code: 'asc' },
+    });
+
+    // Fetch non-blocking booking status ids (cancelled + checked_out)
+    const nonBlockingStatuses = await this.prisma.category.findMany({
+      where: {
+        group: CategoryGroup.BOOKING_STATUS,
+        code: { in: ['cancelled', 'checked_out'] },
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    const nonBlockingIds = nonBlockingStatuses.map((s) => s.id);
+
+    // Find all bookings that overlap the requested range and are blocking
+    const blockingBookings = await this.prisma.booking.findMany({
+      where: {
+        deletedAt: null,
+        statusId: { notIn: nonBlockingIds },
+        checkIn: { lt: checkOut },
+        checkOut: { gt: checkIn },
+      },
+      select: {
+        items: {
+          where: {
+            kind: BookingItemKind.ROOM,
+            roomId: { not: null },
+          },
+          select: { roomId: true },
+        },
+      },
+    });
+
+    // Build set of blocked room IDs
+    const blockedRoomIds = new Set<string>();
+    for (const booking of blockingBookings) {
+      for (const item of booking.items) {
+        if (item.roomId !== null) {
+          blockedRoomIds.add(item.roomId);
+        }
+      }
+    }
+
+    const availableRooms = allRooms.filter((r) => !blockedRoomIds.has(r.id));
+    const bookedCount = allRooms.filter((r) => blockedRoomIds.has(r.id)).length;
+
+    return {
+      data: availableRooms.map(RoomEntity.from),
+      meta: {
+        checkIn: query.checkIn,
+        checkOut: query.checkOut,
+        totalRooms: allRooms.length,
+        totalAvailable: availableRooms.length,
+        totalBooked: bookedCount,
+      },
+    };
   }
 }
