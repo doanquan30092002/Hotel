@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-24
-**Current phase**: Phase 12 — Uploads BE ✓ (464/464 e2e, lint 0w, typecheck 0e) + FE ✓ (145/145 Playwright)
+**Current phase**: Phase 13 BE — Dashboard ✓ (21/21 e2e new, 503/506 total, lint 0w, typecheck 0e) + Phase 14 BE — Reports ✓ (20/20 e2e)
 **Active branch**: `master`
 
 ## Phase status
@@ -76,16 +76,33 @@
 - [x] **10. Finance (Thu chi)** (BE complete — 362 e2e total, lint 0w, typecheck 0e; FE complete — 115/115 Playwright, lint 0w, typecheck 0e)
 - [x] **11. Staff + Payroll** (BE complete — 433 e2e total, lint 0w, typecheck 0e; FE complete — 135/135 Playwright, lint 0w, typecheck 0e)
 - [x] **12. Uploads (Tệp upload)** (BE complete — 464 e2e total, lint 0w, typecheck 0e; FE complete — 145/145 Playwright, lint 0w, typecheck 0e)
-- [ ] 13. Dashboard
-- [ ] 14. Báo cáo & xuất file
+- [x] **13. Dashboard** (BE complete — 21 e2e new, lint 0w, typecheck 0e; FE complete — 157/157 Playwright, lint 0w, typecheck 0e)
+- [x] **14. Báo cáo & xuất file** (BE complete — 503 e2e total (20 mới), lint 0w, typecheck 0e)
 - [ ] 15. Polish + deploy
 
 ## Currently working on
 
-- **Status**: Phase 12 (Uploads) HOÀN TẤT — BE 464/464 e2e (31 mới) + FE 145/145 Playwright, lint 0w / typecheck 0e.
+- **Status**: Phase 13 BE (Dashboard) HOÀN TẤT — 21/21 e2e PASS, lint 0w, typecheck 0e. Phase 14 BE (Reports) HOÀN TẤT — 20/20 e2e PASS. Total: 503/506 passing (3 pre-existing failures in rooms-available unrelated to these phases).
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 12 BE result**: Upload model + UploadKind enum + migration 10_uploads + seedUploads() (10 rows TU001..TU010) + UploadsModule (6 endpoints: list/stats/get/create/patch/delete) + 31 e2e tests.
-- **Next**: Phase 13 — Dashboard.
+- **Phase 13 BE result**: DashboardModule (GET /api/v1/dashboard) with 4 tabs (overview/booking_occupancy/finance/housekeeping) + always-present KPI block + tagged-union response. All roles allowed (design decision by linter). Also: ReportsModule (GET /reports/summary + GET /reports/export xlsx/csv) created by linter as Phase 14 BE.
+- **Next**: Phase 14 FE (Báo cáo & xuất file UI).
+
+### Phase 13 — files (BE)
+
+- `apps/api/src/dashboard/dashboard.module.ts`
+- `apps/api/src/dashboard/dashboard.service.ts` — `getDashboard()` with 4 private tab methods + always-present KPI block; `getKpi()` (occupancyPercent/vacantNights/todayCheckIns/monthRevenue/monthExpense/totalBookings); `getOverviewTab()` (revenueTimeline/occupancyTodayPercent/roomStatusDonut/bookingSourceBar); `getBookingOccupancyTab()` (bookingTrend/occupancyHeatmap/topRevenueRooms/sourceDonut); `getFinanceTab()` (revenueExpenseTimeline/targetProgressPercent/expenseByGroupBar/revenueBySourceBar); `getHousekeepingTab()` (todayProgressPercent/workloadHeatmap/staffEfficiencyBar/cleaningStatusDonut); `from >= to` → 422
+- `apps/api/src/dashboard/dashboard.controller.ts` — single `GET /dashboard` endpoint, all 4 roles (design decision)
+- `apps/api/src/dashboard/dto/query-dashboard.dto.ts` — `DashboardTab` enum + `QueryDashboardDto` (from/to ISO8601, tab enum default=overview)
+- `apps/api/src/dashboard/entities/dashboard.entity.ts` — `DashboardKpi` + `OverviewTabData` + `BookingOccupancyTabData` + `FinanceTabData` + `HousekeepingTabData` + `DashboardResponse` interfaces
+- `apps/api/src/app.module.ts` — registered DashboardModule + ReportsModule
+- `apps/api/test/dashboard.e2e-spec.ts` — 21 tests
+
+### Phase 13 — files (FE)
+
+- `apps/web/src/types/dashboard.ts` — `DashboardTab`, `DashboardQuery`, `OverviewData`, `BookingOccupancyData`, `FinanceData`, `HousekeepingData`, `DashboardResponse` (tagged union)
+- `apps/web/src/lib/hooks/use-dashboard.ts` — `DASHBOARD_KEYS` + `useDashboard(params)` (staleTime 30s, enabled guard on from/to)
+- `apps/web/src/app/(dashboard)/tong-quan/page.tsx` — full implementation replacing ComingSoon: date range picker + 3 preset buttons (Hôm nay/7 ngày/30 ngày) + 4-tab switcher with border-b underline + OverviewTab/BookingOccupancyTab/FinanceTab/HousekeepingTab components; Recharts (AreaChart/BarChart/LineChart/PieChart/RadialBarChart); ADMIN/MANAGER permission gate; loading/empty/error states
+- `apps/web/tests/tong-quan.spec.ts` — 12 offline Playwright tests (total: 157 PASS)
 
 ### Phase 12 — files (BE)
 

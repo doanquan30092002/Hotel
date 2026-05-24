@@ -782,6 +782,141 @@ function formatFileSize(bytes: number): string {
 
 Show below fileName as secondary text (text-xs text-muted-foreground). No separate column.
 
+## Phase 13 patterns (Dashboard / Tổng quan)
+
+### Recharts wrapper conventions
+
+All Recharts charts use `<ResponsiveContainer width="100%" height={N}>` wrapper. Common patterns:
+
+```tsx
+// Area chart (trend)
+<ResponsiveContainer width="100%" height={240}>
+  <AreaChart data={data}>
+    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="stroke-muted-foreground/20" />
+    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+    <YAxis tick={{ fontSize: 11 }} />
+    <Tooltip />
+    <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} />
+  </AreaChart>
+</ResponsiveContainer>
+
+// Radial gauge for occupancy percent
+<RadialBarChart innerRadius="60%" outerRadius="90%" startAngle={180} endAngle={0} data={data}>
+  <RadialBar dataKey="value" cornerRadius={6} background={{ fill: 'hsl(var(--muted))' }} />
+</RadialBarChart>
+
+// Donut pie chart
+<PieChart>
+  <Pie data={d} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40} paddingAngle={3}>
+    {d.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+  </Pie>
+  <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+  <Tooltip />
+</PieChart>
+
+// Horizontal bar chart (by group)
+<BarChart layout="vertical" data={d} margin={{ left: 16, right: 16 }}>
+  <XAxis type="number" tick={{ fontSize: 11 }} />
+  <YAxis type="category" dataKey="groupName" tick={{ fontSize: 11 }} width={90} />
+  <Bar dataKey="amount" fill="#34D399" radius={[0, 4, 4, 0]} />
+</BarChart>
+```
+
+Chart color palette: `CHART_COLORS = ['hsl(var(--primary))', '#A78BFA', '#F0ABFC', '#34D399', '#FBBF24', '#FB7185']`
+
+### Tab switcher with border-b underline active pattern
+
+```tsx
+const TABS = [
+  { id: 'overview', label: 'Tổng quan' },
+  { id: 'booking_occupancy', label: 'Booking & Công suất' },
+  { id: 'finance', label: 'Tài chính' },
+  { id: 'housekeeping', label: 'Buồng phòng' },
+];
+
+<div className="flex gap-0 border-b border-border" role="tablist">
+  {TABS.map((t) => (
+    <button
+      key={t.id}
+      role="tab"
+      aria-selected={activeTab === t.id}
+      className={cn(
+        'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+        activeTab === t.id
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-foreground',
+      )}
+      onClick={() => setActiveTab(t.id)}
+    >
+      {t.label}
+    </button>
+  ))}
+</div>;
+```
+
+Note: `role="tab"` + `aria-selected` are required for Playwright `getByRole('tab', { name })` locator and accessibility.
+
+### KPI card + sparkline composition
+
+KpiCard = icon + label + bold value (isLoading shows Skeleton) + optional subLabel + optional mini AreaChart (h-12, no axes/tooltip/grid, just the area fill):
+
+```tsx
+{
+  trend && trend.length > 1 && !isLoading && (
+    <div className="h-12">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={sparklineData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+          <Area
+            type="monotone"
+            dataKey="v"
+            stroke="hsl(var(--primary))"
+            fill="hsl(var(--primary))"
+            fillOpacity={0.15}
+            strokeWidth={1.5}
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+```
+
+### Date range preset pattern
+
+```ts
+function getPreset(preset: 'today' | '7days' | '30days'): { from: string; to: string } {
+  const t = new Date();
+  if (preset === 'today') return { from: toIso(t), to: toIso(addDays(t, 1)) };
+  if (preset === '7days') return { from: toIso(addDays(t, -7)), to: toIso(addDays(t, 1)) };
+  return { from: toIso(addDays(t, -30)), to: toIso(addDays(t, 1)) };
+}
+```
+
+Default: 30-day range (`from = today-30`, `to = today+1`). "to" is exclusive (next day boundary).
+
+### Dashboard query hook pattern
+
+- Hook: `useDashboard({ from, to, tab })` — single hook call per tab switch, no waterfall.
+- `staleTime: 30_000`, `enabled: !!params.from && !!params.to`.
+- Response is a tagged union — only one of `overview / bookingOccupancy / finance / housekeeping` is populated per request (per `tab` param).
+- Mocking in Playwright: single `**/api/v1/dashboard**` route handler returns all 4 slots populated for simplicity (mock doesn't need to be tab-accurate).
+
+### DASHBOARD_KEYS query key factory
+
+```ts
+export const DASHBOARD_KEYS = {
+  all: ['dashboard'] as const,
+  data: (p: DashboardQuery) => ['dashboard', 'data', p] as const,
+};
+```
+
+Tab is part of the query key — switching tabs fires a new fetch (different key).
+
+### Combined income+expense trend chart
+
+When two parallel trend arrays (incomeTrend + expenseTrend) need to be merged into one AreaChart with two Area series, merge by date using `Array.from(new Set([...dates1, ...dates2])).sort()` then map each date to `{ date, income, expense }`. Use `find()` to match each trend array.
+
 ### Test locator fix — fileName instead of code
 
 The Uploads table does NOT render `upload.code` ("TU001") — it renders `upload.fileName`. Playwright test 3 should assert fileName visibility, not code:

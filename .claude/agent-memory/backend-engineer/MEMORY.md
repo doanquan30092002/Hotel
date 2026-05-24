@@ -780,6 +780,108 @@ uploadedBy  User?  @relation("UploadUploadedBy", fields: [uploadedById], referen
 uploads  Upload[]  @relation("UploadUploadedBy")
 ```
 
+## Patterns added in Phase 13
+
+### Dashboard aggregation endpoint (read-only, no new tables)
+
+Pattern: single `GET /dashboard?from&to&tab` that returns a `kpi` block (always) plus one
+tab-specific block. See `apps/api/src/dashboard/dashboard.service.ts`.
+
+Key decisions:
+
+- `kpi` computed on every request regardless of tab.
+- Tab blocks are optional fields on the response; only the requested tab is populated.
+- All 4 roles (ADMIN/MANAGER/RECEPTIONIST/HOUSEKEEPING) can read.
+- `from < to` validated at service layer → 422 `UnprocessableEntityException`.
+
+#### Date helpers
+
+```ts
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function getDateRange(from: string, to: string): string[] {
+  const result: string[] = [];
+  let cur = new Date(from + 'T00:00:00Z');
+  const end = new Date(to + 'T00:00:00Z');
+  while (cur < end) {
+    result.push(toIsoDate(cur));
+    cur = new Date(cur.getTime() + 86400000);
+  }
+  return result;
+}
+
+// Normalise a Prisma @db.Date field (comes back as Date midnight local) to UTC midnight for arithmetic
+function toMidnightUtc(d: Date): Date {
+  return new Date(toIsoDate(d) + 'T00:00:00Z');
+}
+```
+
+Always use `toMidnightUtc()` before comparing `@db.Date` Prisma fields to UTC boundaries.
+
+#### Category lookup pattern for donut/bar charts
+
+```ts
+const countMap = new Map<string, number>();
+for (const r of rows) {
+  countMap.set(r.categoryId, (countMap.get(r.categoryId) ?? 0) + 1);
+}
+const ids = Array.from(countMap.keys());
+const cats =
+  ids.length > 0
+    ? await prisma.category.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+        select: { id, code, name },
+      })
+    : [];
+const lookup = new Map(cats.map((c) => [c.id, c]));
+const donut = ids.map((id) => ({
+  code: lookup.get(id)?.code ?? id,
+  name: lookup.get(id)?.name ?? id,
+  count: countMap.get(id) ?? 0,
+}));
+```
+
+#### occupancyHeatmap (Room × Day matrix)
+
+Build a `Set<string>` of `"${roomId}::${date}"` keys from bookings; then map rooms × days:
+
+```ts
+const occupiedSet = new Set<string>();
+for (const b of bookings) {
+  const bCheckIn = toMidnightUtc(b.checkIn);
+  const bCheckOut = toMidnightUtc(b.checkOut);
+  for (const item of b.items) {
+    if (!item.roomId) continue;
+    let cur = new Date(bCheckIn);
+    while (cur < bCheckOut) {
+      occupiedSet.add(`${item.roomId}::${toIsoDate(cur)}`);
+      cur = new Date(cur.getTime() + MS_PER_DAY);
+    }
+  }
+}
+```
+
+Cap to first 20 rooms × 31 days to keep payload manageable.
+
+#### Setting.monthlyRevenueTarget → targetProgressPercent
+
+```ts
+const setting = await prisma.setting.findUnique({
+  where: { id: 'singleton' },
+  select: { monthlyRevenueTarget: true },
+});
+if (setting?.monthlyRevenueTarget && !new Prisma.Decimal(setting.monthlyRevenueTarget).isZero()) {
+  targetProgressPercent = Math.min(
+    100,
+    Math.round(
+      monthRevenue.div(new Prisma.Decimal(setting.monthlyRevenueTarget)).mul(100).toNumber(),
+    ),
+  );
+}
+```
+
 ## Decisions
 
 - 2026-05-21: Booking dùng `BookingItem` polymorphic theo `kind` (room|service|surcharge|discount) thay vì 4 bảng riêng.
@@ -851,3 +953,84 @@ export function paginate<T>(data: T[], total: number, page: number, pageSize: nu
 
 - `import * as request from 'supertest'` causes TS error with newer supertest types — use `import request from 'supertest'` instead.
 - Always run `npx eslint --fix` before typecheck to avoid Prettier formatting errors counted as lint errors.
+
+## Patterns added in Phase 14
+
+### ExcelJS streaming XLSX export from NestJS
+
+Install `exceljs` in `apps/api/package.json` dependencies. Use `import * as ExcelJS from 'exceljs'`.
+
+```ts
+// Controller pattern — use @Res({ passthrough: false }) to bypass global interceptors on binary stream
+@Get('export')
+@Roles('ADMIN', 'MANAGER')
+async exportReport(
+  @Query() query: QueryReportExportDto,
+  @Res({ passthrough: false }) res: Response,
+): Promise<void> {
+  const buffer = await this.reportsService.generateXlsx(query);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="report-${query.from}-to-${query.to}.xlsx"`);
+  res.setHeader('Content-Length', buffer.length);
+  res.send(buffer);
+}
+```
+
+```ts
+// Service pattern
+async generateXlsx(query: QueryReportDto): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Tổng quan');
+  sheet.columns = [{ header: 'Chỉ tiêu', key: 'label', width: 30 }, ...];
+  for (const row of rows) { sheet.addRow(row); }
+  // Style header
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+```
+
+### CSV export with UTF-8 BOM
+
+```ts
+async generateCsv(...): Promise<Buffer> {
+  const BOM = '﻿';  // ﻿
+  const header = 'label,value,note\n';
+  const rows = data.map(r => `"${r.label}","${r.value}","${r.note}"`).join('\n');
+  return Buffer.from(BOM + header + rows, 'utf-8');
+}
+```
+
+### Supertest binary parse in e2e tests
+
+For endpoints that stream binary data (XLSX, PDF), use `.buffer(true).parse(...)` to accumulate body as Buffer:
+
+```ts
+const res = await request(app.getHttpServer())
+  .get('/api/v1/reports/export?from=2026-01-01&to=2026-12-31')
+  .set('Authorization', `Bearer ${adminToken}`)
+  .buffer(true)
+  .parse((response, callback) => {
+    const chunks: Buffer[] = [];
+    response.on('data', (chunk: Buffer) => chunks.push(chunk));
+    response.on('end', () => callback(null, Buffer.concat(chunks)));
+  })
+  .expect(200);
+
+const body = res.body as Buffer;
+expect(Buffer.isBuffer(body)).toBe(true);
+expect(body.length).toBeGreaterThan(1000);
+```
+
+### Read-only aggregation module (no new Prisma model)
+
+Phase 14 pattern (same as Phase 7 Calendar) — purely derived data over existing models:
+
+1. No Prisma migration needed.
+2. Service queries Booking+BookingItem+FinanceTx+Room with plain `findMany` + in-JS aggregation.
+3. `Prisma.Decimal` arithmetic ensures precision — `.toString()` for output.
+4. `Prisma.Decimal.div()` used for ADR (averageDailyRate) — guard against division by zero.
+5. Top-N lists: sort array by `.revenue.greaterThan(b.revenue)` comparator then `.slice(0, 10)`.
+6. `from >= to` validation → `UnprocessableEntityException` (422), same as Finance module.
