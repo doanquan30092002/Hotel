@@ -925,3 +925,198 @@ The Uploads table does NOT render `upload.code` ("TU001") — it renders `upload
 // WRONG: page.getByText('TU001') — code not rendered in table
 // CORRECT: page.getByText('Homestay_nha_anh_phng_phm_20260500094034.png').first()
 ```
+
+## Phase 14 patterns (Reports / Báo cáo)
+
+### RBAC for reports page
+
+- HOUSEKEEPING → `PermissionDenied` panel.
+- RECEPTIONIST → can view summary but cannot export (export button hidden).
+- ADMIN/MANAGER → can view + export XLSX/CSV.
+
+```tsx
+export default function BaoCaoPage() {
+  const { hasRole } = useAuth();
+  const canView = hasRole('ADMIN', 'MANAGER', 'RECEPTIONIST');
+  const canExport = hasRole('ADMIN', 'MANAGER');
+  if (!canView) return <PermissionDenied />;
+  return <BaoCaoContent canExport={canExport} />;
+}
+```
+
+### useExportReport mutation pattern
+
+`useExportReport()` uses `useMutation` (not `useQuery`) and triggers a browser file download:
+
+```ts
+export function useExportReport() {
+  return useMutation({
+    mutationFn: async ({ from, to, format }) => {
+      const res = await api.get('/reports/export', {
+        params: { from, to, format },
+        responseType: 'blob',
+      });
+      const filename = `bao-cao-${from}-den-${to}.${format}`;
+      const contentType = res.headers['content-type'] ?? 'application/octet-stream';
+      const blob = new Blob([res.data], { type: contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+```
+
+### Button accessible name vs aria-label gotcha
+
+When a `<Button aria-label="Xuất file XLSX">Xuất XLSX</Button>` is used, the **accessible name** is the `aria-label` value ("Xuất file XLSX"), NOT the visible text ("Xuất XLSX"). Playwright's `getByRole('button', { name: /Xuất XLSX/ })` will NOT match if `aria-label` is "Xuất file XLSX".
+
+Fix options:
+
+- Use `page.locator('button').filter({ hasText: 'Xuất XLSX' })` — matches by text content.
+- Or `getByRole('button', { name: /Xuất file XLSX/ })` — matches the aria-label.
+- Or remove the `aria-label` when text is already descriptive enough.
+
+### Strict mode violation: text in KPI card + table row
+
+Labels like "Chi vận hành" appear in both KPI card and report table rows → `getByText('Chi vận hành')` throws strict mode violation. Always use `.first()`:
+
+```ts
+await expect(page.getByText('Chi vận hành').first()).toBeVisible();
+```
+
+### Reports page layout
+
+- Breadcrumb strip → Header with title + date inputs + Áp dụng/In báo cáo/Xuất XLSX buttons.
+- 5 KPI cards in responsive grid (`grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5`).
+- 2-panel grid 2/3+1/3: summary table (left) + top rooms vertical bar chart (right).
+- Bottom row 1/3+2/3: booking status donut (left) + top sources horizontal bar chart (right).
+- Error state shows "Không thể tải báo cáo" + Retry button outside the `isError` toggle.
+- Empty table: "Chưa có dữ liệu trong khoảng này".
+
+### REPORT_KEYS query key factory
+
+```ts
+export const REPORT_KEYS = {
+  all: ['reports'] as const,
+  summary: (p: { from: string; to: string }) => ['reports', 'summary', p] as const,
+};
+```
+
+### Default date range for reports (current month, exclusive end)
+
+```ts
+function defaultRange(): { from: string; to: string } {
+  const today = new Date();
+  const from = new Date(today.getFullYear(), today.getMonth(), 1);
+  const to = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  return { from: toIso(from), to: toIso(to) };
+}
+```
+
+## Phase 13 FE — fix patterns (Dashboard / Tổng quan)
+
+### Typed chart data instead of Record<string, unknown>
+
+When chart components accept `data: Array<Record<string, unknown>>`, TypeScript strict mode rejects passing `CategoryCount[]` (index signature missing). Fix: define a local interface or accept the specific type directly:
+
+```tsx
+// WRONG — TypeScript error with strict mode:
+data: Array<Record<string, unknown>>;
+
+// CORRECT — use a specific typed interface:
+interface BarDataPoint {
+  name: string;
+  [key: string]: string | number;
+}
+// Or use the specific domain type:
+data: CategoryCount[];
+dataKey: keyof CategoryCount;
+nameKey: keyof CategoryCount;
+```
+
+For DonutChart using `CategoryCount[]`, use `dataKey: keyof CategoryCount` so both `'count'` and `'name'` are valid. For bar charts with derived numeric values, use the `BarDataPoint` interface.
+
+### useMemo conditional call rule violation fix
+
+If a component has an early return (`if (isError) return <ErrorState>`) BEFORE hook calls (`useMemo`, `useState`, etc.), ESLint `react-hooks/rules-of-hooks` fires because hooks would be called conditionally. Fix: move ALL hook calls above the early return:
+
+```tsx
+// WRONG:
+function BookingTab({ data, isError, onRetry }) {
+  if (isError) return <ErrorState onRetry={onRetry} />; // ← early return before useMemo
+  const bookingTrend = useMemo(() => ..., [data]); // ← ERROR: conditional hook
+  ...
+}
+
+// CORRECT:
+function BookingTab({ data, isError, onRetry }) {
+  // ALL useMemo/useState calls FIRST, before any early return:
+  const bookingTrend = useMemo(() => (data?.bookingTrend ?? []).map(...), [data]);
+  const topRooms = useMemo(() => (data?.topRevenueRooms ?? []).map(...), [data]);
+
+  if (isError) return <ErrorState onRetry={onRetry} />; // ← safe, after all hooks
+  ...
+}
+```
+
+### react-hooks/exhaustive-deps warning for derived arrays in useMemo
+
+When an intermediate variable `const arr = data?.something ?? []` is used inside `useMemo`, and `arr` is not stable (re-created each render), use `data` directly in the useMemo callback + dependency instead:
+
+```tsx
+// WRONG — ESLint warning: 'topRooms' could change every render
+const topRooms = data?.topRooms ?? [];
+const topRoomsChart = useMemo(() => topRooms.slice(0, 8).map(...), [topRooms]);
+
+// CORRECT — use data directly:
+const topRoomsChart = useMemo(() => (data?.topRooms ?? []).slice(0, 8).map(...), [data]);
+```
+
+### PermissionDenied pattern for dashboard (ADMIN/MANAGER only)
+
+The dashboard page requires ADMIN or MANAGER role (not all 4 roles). Use the same page-level split pattern:
+
+```tsx
+export default function TongQuanPage() {
+  const { hasRole } = useAuth();
+  // All useState/useDashboard hooks FIRST (before any conditional return)
+  const [from, setFrom] = useState(defaultRange.from);
+  // ...
+  const canView = hasRole('ADMIN', 'MANAGER');
+
+  if (!canView) return <PermissionDenied />;
+  return <div>...</div>;
+}
+```
+
+Note: unlike Finance page which uses a separate inner component for RBAC split, TongQuanPage places all hooks before the permission check since they're lightweight (no expensive hooks like useHousekeepingTasks).
+
+### Dashboard test mock shape (must match actual BE DashboardResponse)
+
+Test mock must use the real API shape with `kpi` block always present + optional `overview/bookingOccupancy/finance/housekeeping`:
+
+```ts
+const MOCK_DASHBOARD = {
+  data: {
+    from: '2026-05-01', to: '2026-06-01', tab: 'overview',
+    kpi: { occupancyPercent: 40, vacantNights: 5, todayCheckIns: 4,
+           monthRevenue: '37810000', monthExpense: '12500000', totalBookings: 42 },
+    overview: { revenueTimeline: [...], occupancyTodayPercent: 40,
+                roomStatusDonut: [...], bookingSourceBar: [...] },
+    bookingOccupancy: { bookingTrend: [...], occupancyHeatmap: [...],
+                        topRevenueRooms: [...], sourceDonut: [...] },
+    finance: { revenueExpenseTimeline: [...], targetProgressPercent: 4,
+               expenseByGroupBar: [...], revenueBySourceBar: [...] },
+    housekeeping: { todayProgressPercent: 20, workloadHeatmap: [...],
+                    staffEfficiencyBar: [...], cleaningStatusDonut: [...] },
+  },
+};
+```
+
+Do NOT use old shape (e.g., `overview.totalBookings`, `overview.revenueTrend`) — those come from the wrong BE version.

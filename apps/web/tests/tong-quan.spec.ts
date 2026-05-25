@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Dashboard Tổng quan — offline-friendly Playwright tests.
  * All API calls are intercepted/mocked — no live BE required.
- * 12 tests total (baseline 145, target ≥ 157).
+ * 12 tests total.
  */
 
 const ADMIN_AUTH = JSON.stringify({
@@ -64,108 +64,105 @@ const MOCK_ME_RECEPTIONIST = {
   },
 };
 
-// Full mock fixture containing data for all 4 tabs
+// Full mock fixture matching the actual BE DashboardResponse shape
 const MOCK_DASHBOARD = {
   data: {
-    from: '2026-04-25',
-    to: '2026-05-25',
+    from: '2026-05-01',
+    to: '2026-06-01',
     tab: 'overview',
-    overview: {
-      totalBookings: 42,
-      totalRevenue: '37810000',
+    kpi: {
       occupancyPercent: 40,
-      totalGuests: 128,
-      bookingsTrend: [
-        { date: '2026-05-01', value: 3 },
-        { date: '2026-05-02', value: 5 },
-        { date: '2026-05-03', value: 2 },
-        { date: '2026-05-04', value: 7 },
-        { date: '2026-05-05', value: 4 },
+      vacantNights: 5,
+      todayCheckIns: 4,
+      monthRevenue: '37810000',
+      monthExpense: '12500000',
+      totalBookings: 42,
+    },
+    overview: {
+      revenueTimeline: [
+        { date: '2026-05-01', revenue: '6150000', expense: '2000000', profit: '4150000' },
+        { date: '2026-05-02', revenue: '8200000', expense: '2500000', profit: '5700000' },
+        { date: '2026-05-03', revenue: '4300000', expense: '1800000', profit: '2500000' },
+        { date: '2026-05-04', revenue: '9100000', expense: '3000000', profit: '6100000' },
+        { date: '2026-05-05', revenue: '5500000', expense: '2200000', profit: '3300000' },
       ],
-      revenueTrend: [
-        { date: '2026-05-01', value: '6150000' },
-        { date: '2026-05-02', value: '8200000' },
-        { date: '2026-05-03', value: '4300000' },
-        { date: '2026-05-04', value: '9100000' },
-        { date: '2026-05-05', value: '5500000' },
+      occupancyTodayPercent: 40,
+      roomStatusDonut: [
+        { code: 'available', name: 'Sẵn sàng', count: 5 },
+        { code: 'occupied', name: 'Đang ở', count: 4 },
+        { code: 'maintenance', name: 'Bảo trì', count: 1 },
+      ],
+      bookingSourceBar: [
+        { code: 'walkin', name: 'Walk-in', count: 20 },
+        { code: 'online', name: 'Online', count: 15 },
+        { code: 'phone', name: 'Điện thoại', count: 7 },
       ],
     },
     bookingOccupancy: {
-      totalBookings: 42,
-      newBookingsTrend: [
-        { date: '2026-05-01', value: 3 },
-        { date: '2026-05-02', value: 5 },
+      bookingTrend: [
+        { date: '2026-05-01', count: 3 },
+        { date: '2026-05-02', count: 5 },
+        { date: '2026-05-03', count: 2 },
+        { date: '2026-05-04', count: 7 },
+        { date: '2026-05-05', count: 4 },
       ],
-      occupancyTrend: [
-        { date: '2026-05-01', value: 35 },
-        { date: '2026-05-02', value: 42 },
-      ],
-      statusBreakdown: [
-        { statusCode: 'confirmed', statusName: 'Đã xác nhận', count: 18 },
-        { statusCode: 'checked_in', statusName: 'Đang ở', count: 12 },
-        { statusCode: 'pending', statusName: 'Chờ xác nhận', count: 8 },
-        { statusCode: 'cancelled', statusName: 'Đã huỷ', count: 4 },
-      ],
-      sourceBreakdown: [
-        { sourceCode: 'direct', sourceName: 'Trực tiếp', count: 22 },
-        { sourceCode: 'online', sourceName: 'Trực tuyến', count: 14 },
-        { sourceCode: 'phone', sourceName: 'Điện thoại', count: 6 },
-      ],
-      topRooms: [
+      occupancyHeatmap: [
         {
-          roomId: 'r1',
           roomCode: 'P101',
-          roomName: 'Phòng tiêu chuẩn 101',
-          bookingCount: 8,
-          revenue: '12500000',
+          days: [
+            { date: '2026-05-01', occupied: true },
+            { date: '2026-05-02', occupied: false },
+            { date: '2026-05-03', occupied: true },
+          ],
         },
         {
-          roomId: 'r2',
-          roomCode: 'V101',
-          roomName: 'Phòng VIP 101',
-          bookingCount: 6,
-          revenue: '9800000',
+          roomCode: 'P102',
+          days: [
+            { date: '2026-05-01', occupied: false },
+            { date: '2026-05-02', occupied: true },
+            { date: '2026-05-03', occupied: false },
+          ],
         },
+      ],
+      topRevenueRooms: [
+        { roomId: 'r1', code: 'P101', name: 'Phòng tiêu chuẩn 101', revenue: '12500000' },
+        { roomId: 'r2', code: 'V101', name: 'Phòng VIP 101', revenue: '9800000' },
+      ],
+      sourceDonut: [
+        { code: 'walkin', name: 'Walk-in', count: 22 },
+        { code: 'online', name: 'Trực tuyến', count: 14 },
+        { code: 'phone', name: 'Điện thoại', count: 6 },
       ],
     },
     finance: {
-      totalIncome: '37810000',
-      totalExpense: '12500000',
-      netProfit: '25310000',
-      incomeTrend: [
-        { date: '2026-05-01', value: '6150000' },
-        { date: '2026-05-02', value: '8200000' },
+      revenueExpenseTimeline: [
+        { date: '2026-05-01', revenue: '6150000', expense: '2100000', profit: '4050000' },
+        { date: '2026-05-02', revenue: '8200000', expense: '3400000', profit: '4800000' },
       ],
-      expenseTrend: [
-        { date: '2026-05-01', value: '2100000' },
-        { date: '2026-05-02', value: '3400000' },
+      targetProgressPercent: 4,
+      expenseByGroupBar: [
+        { code: 'ops', name: 'Vận hành', amount: '8000000' },
+        { code: 'salary', name: 'Lương', amount: '4500000' },
       ],
-      incomeByGroup: [
-        { groupCode: 'room', groupName: 'Phòng', amount: '30000000' },
-        { groupCode: 'service', groupName: 'Dịch vụ', amount: '7810000' },
-      ],
-      expenseByGroup: [
-        { groupCode: 'ops', groupName: 'Vận hành', amount: '8000000' },
-        { groupCode: 'salary', groupName: 'Lương', amount: '4500000' },
+      revenueBySourceBar: [
+        { code: 'room', name: 'Phòng', amount: '30000000' },
+        { code: 'service', name: 'Dịch vụ', amount: '7810000' },
       ],
     },
     housekeeping: {
-      totalTasks: 20,
-      completionRate: 75,
-      avgCompletionHours: 1.5,
-      byStatus: [
-        { statusCode: 'done', statusName: 'Hoàn thành', count: 15 },
-        { statusCode: 'in_progress', statusName: 'Đang làm', count: 3 },
-        { statusCode: 'waiting', statusName: 'Chờ', count: 2 },
+      todayProgressPercent: 20,
+      workloadHeatmap: [
+        { date: '2026-05-01', counts: { high: 2, normal: 5, low: 1 } },
+        { date: '2026-05-02', counts: { high: 1, normal: 3, low: 2 } },
       ],
-      byPriority: [
-        { priority: 'high', count: 5 },
-        { priority: 'normal', count: 12 },
-        { priority: 'low', count: 3 },
+      staffEfficiencyBar: [
+        { staffId: 'u3', fullName: 'Nguyễn Thị Lan', doneCount: 8, avgMinutes: 35 },
+        { staffId: 'u4', fullName: 'Trần Văn Bình', doneCount: 7, avgMinutes: 40 },
       ],
-      topAssignees: [
-        { assigneeId: 'u3', assigneeName: 'Nguyễn Thị Lan', doneCount: 8 },
-        { assigneeId: 'u4', assigneeName: 'Trần Văn Bình', doneCount: 7 },
+      cleaningStatusDonut: [
+        { code: 'clean', name: 'Sạch', count: 6 },
+        { code: 'dirty', name: 'Cần dọn', count: 3 },
+        { code: 'in_progress', name: 'Đang dọn', count: 1 },
       ],
     },
   },
@@ -203,6 +200,28 @@ async function setupMocksReceptionist(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(MOCK_DASHBOARD),
+    }),
+  );
+}
+
+async function setupMocks500(page: import('@playwright/test').Page) {
+  await page.route('**/api/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(MOCK_ME_ADMIN),
+    }),
+  );
+
+  await page.route('**/api/v1/dashboard**', (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      }),
     }),
   );
 }
@@ -248,89 +267,107 @@ test.describe('Dashboard Tổng quan (offline-friendly)', () => {
     await expect(page.getByRole('tab', { name: 'Buồng phòng' })).toBeVisible({ timeout: 4000 });
   });
 
-  test('4. clicking "Tài chính" tab switches active tab', async ({ page }) => {
+  test('4. KPI cards visible — 6 labels present', async ({ page }) => {
+    await gotoAsAdmin(page);
+    await expect(page.getByText('Tổng booking').first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Công suất phòng').first()).toBeVisible();
+    await expect(page.getByText('Check-in hôm nay').first()).toBeVisible();
+    await expect(page.getByText('Doanh thu tháng').first()).toBeVisible();
+    await expect(page.getByText('Chi phí tháng').first()).toBeVisible();
+    await expect(page.getByText('Phòng trống sạch').first()).toBeVisible();
+  });
+
+  test('5. default tab "Tổng quan" shows chart SVG', async ({ page }) => {
+    await gotoAsAdmin(page);
+    const tabBtn = page.getByRole('tab', { name: 'Tổng quan' });
+    await expect(tabBtn).toHaveAttribute('aria-selected', 'true');
+    // Recharts renders SVG elements
+    await expect(page.locator('svg').first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test('6. switch to "Booking & Công suất" tab — heatmap visible', async ({ page }) => {
+    await gotoAsAdmin(page);
+    const tabBtn = page.getByRole('tab', { name: 'Booking & Công suất' });
+    await expect(tabBtn).toBeVisible({ timeout: 8000 });
+    await tabBtn.click();
+    await expect(tabBtn).toHaveAttribute('aria-selected', 'true');
+    // Heatmap heading should appear
+    await expect(page.getByText('Heatmap công suất').first()).toBeVisible({ timeout: 5000 });
+    // Heatmap cells with room code P101
+    await expect(page.getByText('P101').first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('7. switch to "Tài chính" tab — Target gauge visible', async ({ page }) => {
     await gotoAsAdmin(page);
     const tabBtn = page.getByRole('tab', { name: 'Tài chính' });
     await expect(tabBtn).toBeVisible({ timeout: 8000 });
     await tabBtn.click();
     await expect(tabBtn).toHaveAttribute('aria-selected', 'true');
-    // Finance KPI labels should appear
-    await expect(page.getByText('Tổng thu').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Target doanh thu tháng').first()).toBeVisible({ timeout: 5000 });
+    // The gauge shows percent: 4%
+    await expect(page.getByText('4%').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('5. clicking "Buồng phòng" tab switches active tab', async ({ page }) => {
+  test('8. switch to "Buồng phòng" tab — Tiến độ gauge visible', async ({ page }) => {
     await gotoAsAdmin(page);
     const tabBtn = page.getByRole('tab', { name: 'Buồng phòng' });
     await expect(tabBtn).toBeVisible({ timeout: 8000 });
     await tabBtn.click();
     await expect(tabBtn).toHaveAttribute('aria-selected', 'true');
-    // Housekeeping KPI labels should appear
-    await expect(page.getByText('Tổng công việc').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Tiến độ dọn phòng hôm nay').first()).toBeVisible({
+      timeout: 5000,
+    });
+    // The gauge shows todayProgressPercent: 20%
+    await expect(page.getByText('20%').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('6. KPI "Tổng booking" is visible on overview tab', async ({ page }) => {
-    await gotoAsAdmin(page);
-    await expect(page.getByText('Tổng booking').first()).toBeVisible({ timeout: 8000 });
-    // Mock data has totalBookings: 42
-    await expect(page.getByText('42').first()).toBeVisible({ timeout: 5000 });
-  });
-
-  test('7. KPI "Doanh thu" shows formatted VND', async ({ page }) => {
-    await gotoAsAdmin(page);
-    await expect(page.getByText('Doanh thu').first()).toBeVisible({ timeout: 8000 });
-    // formatVnd('37810000') = '37.810.000 đ'
-    await expect(page.getByText(/37\.810\.000/).first()).toBeVisible({ timeout: 5000 });
-  });
-
-  test('8. date range "Từ ngày" input is present', async ({ page }) => {
+  test('9. from/to date inputs are editable', async ({ page }) => {
     await gotoAsAdmin(page);
     const fromInput = page.getByLabel('Từ ngày');
+    const toInput = page.getByLabel('Đến ngày');
     await expect(fromInput).toBeVisible({ timeout: 8000 });
+    await expect(toInput).toBeVisible({ timeout: 4000 });
+    await fromInput.fill('2026-04-01');
+    await expect(fromInput).toHaveValue('2026-04-01');
+    await toInput.fill('2026-04-30');
+    await expect(toInput).toHaveValue('2026-04-30');
   });
 
-  test('9. preset "7 ngày" button changes from date', async ({ page }) => {
+  test('10. "7 ngày gần nhất" preset button changes from date', async ({ page }) => {
     await gotoAsAdmin(page);
     const fromInput = page.getByLabel('Từ ngày');
     await expect(fromInput).toBeVisible({ timeout: 8000 });
 
-    // Get current from value before click
     const beforeValue = await fromInput.inputValue();
 
     const sevenDaysBtn = page.getByRole('button', { name: '7 ngày gần nhất' });
+    await expect(sevenDaysBtn).toBeVisible({ timeout: 4000 });
     await sevenDaysBtn.click();
 
-    // After clicking 7 ngày, the from date should change (now = today-7)
     const afterValue = await fromInput.inputValue();
-    // Value should be present (non-empty)
     expect(afterValue.length).toBeGreaterThan(0);
-    // The from value should typically differ from the 30-day default
-    // (unless we're testing on the same day, just check it's a valid date)
     expect(afterValue).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // And they should actually differ (30-day preset vs 7-day)
+    // Default is start-of-month; 7-day preset is today-7, which differs unless today IS start-of-month
+    // Just verify it's a valid date that changed
     expect(afterValue).not.toBe(beforeValue);
   });
 
-  test('10. RECEPTIONIST sees PermissionDenied screen', async ({ page }) => {
+  test('11. RECEPTIONIST sees PermissionDenied screen', async ({ page }) => {
     await gotoAsReceptionist(page);
     await expect(page.getByText('Bạn không có quyền truy cập').first()).toBeVisible({
       timeout: 8000,
     });
   });
 
-  test('11. chart SVG element is present on overview tab', async ({ page }) => {
-    await gotoAsAdmin(page);
-    // Wait for data to load — charts render SVG elements
-    await expect(page.locator('svg').first()).toBeVisible({ timeout: 8000 });
-  });
-
-  test('12. "Phân bổ trạng thái booking" legend appears on Booking & Công suất tab', async ({
-    page,
-  }) => {
-    await gotoAsAdmin(page);
-    const tabBtn = page.getByRole('tab', { name: 'Booking & Công suất' });
-    await expect(tabBtn).toBeVisible({ timeout: 8000 });
-    await tabBtn.click();
-    // Status breakdown renders as donut with legend items — look for a known status name
-    await expect(page.getByText('Đang ở').first()).toBeVisible({ timeout: 6000 });
+  test('12. error state with mocked 500 shows Retry button', async ({ page }) => {
+    await page.addInitScript((a: string) => {
+      window.localStorage.setItem('hotel.auth', a);
+    }, ADMIN_AUTH);
+    await setupMocks500(page);
+    await page.goto('/tong-quan');
+    // The error state inside the tab content shows "Thử lại"
+    await expect(page.getByRole('button', { name: 'Thử lại' }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 });

@@ -2,8 +2,8 @@
 
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
-**Last updated**: 2026-05-24
-**Current phase**: Phase 13 BE — Dashboard ✓ (21/21 e2e new, 503/506 total, lint 0w, typecheck 0e) + Phase 14 BE — Reports ✓ (20/20 e2e)
+**Last updated**: 2026-05-25
+**Current phase**: Phase 13 + 14 HOÀN TẤT — 506/506 e2e (41 mới: 21 dashboard + 20 reports) + 167/167 Playwright (22 mới: 12 tong-quan + 10 bao-cao), lint 0w, typecheck 0e cả 2 workspace
 **Active branch**: `master`
 
 ## Phase status
@@ -76,16 +76,22 @@
 - [x] **10. Finance (Thu chi)** (BE complete — 362 e2e total, lint 0w, typecheck 0e; FE complete — 115/115 Playwright, lint 0w, typecheck 0e)
 - [x] **11. Staff + Payroll** (BE complete — 433 e2e total, lint 0w, typecheck 0e; FE complete — 135/135 Playwright, lint 0w, typecheck 0e)
 - [x] **12. Uploads (Tệp upload)** (BE complete — 464 e2e total, lint 0w, typecheck 0e; FE complete — 145/145 Playwright, lint 0w, typecheck 0e)
-- [x] **13. Dashboard** (BE complete — 21 e2e new, lint 0w, typecheck 0e; FE complete — 157/157 Playwright, lint 0w, typecheck 0e)
-- [x] **14. Báo cáo & xuất file** (BE complete — 503 e2e total (20 mới), lint 0w, typecheck 0e)
+- [x] **13. Dashboard** (BE complete — 21 e2e new, lint 0w, typecheck 0e; FE complete — 12 Playwright new, lint 0w, typecheck 0e)
+- [x] **14. Báo cáo & xuất file** (BE complete — 506 e2e total (20 mới: reports), lint 0w, typecheck 0e; FE complete — 10 Playwright new, 167 total, lint 0w, typecheck 0e)
 - [ ] 15. Polish + deploy
 
 ## Currently working on
 
-- **Status**: Phase 13 BE (Dashboard) HOÀN TẤT — 21/21 e2e PASS, lint 0w, typecheck 0e. Phase 14 BE (Reports) HOÀN TẤT — 20/20 e2e PASS. Total: 503/506 passing (3 pre-existing failures in rooms-available unrelated to these phases).
+- **Status**: Phase 13 (Dashboard) + Phase 14 (Reports) HOÀN TẤT.
+  - BE: 506/506 e2e PASS (19 suites; 41 mới = 21 dashboard + 20 reports), lint 0w, typecheck 0e
+  - FE: 167/167 Playwright PASS (22 mới = 12 tong-quan + 10 bao-cao), lint 0w, typecheck 0e
+  - Pre-existing flake: `lich.spec.ts` "unauthenticated redirect" timing — passes in isolation (10s), not Phase 13/14 related
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 13 BE result**: DashboardModule (GET /api/v1/dashboard) with 4 tabs (overview/booking_occupancy/finance/housekeeping) + always-present KPI block + tagged-union response. All roles allowed (design decision by linter). Also: ReportsModule (GET /reports/summary + GET /reports/export xlsx/csv) created by linter as Phase 14 BE.
-- **Next**: Phase 14 FE (Báo cáo & xuất file UI).
+- **Phase 13 BE result**: DashboardModule with single `GET /dashboard?from&to&tab` endpoint covering 4 tabs (overview/booking_occupancy/finance/housekeeping) + always-present KPI block. No DB schema change — pure aggregation over Booking/BookingItem/Payment/Room/FinanceTx/HousekeepingTask/Category. RBAC: all 4 roles.
+- **Phase 13 FE result**: Full /tong-quan page replacing ComingSoon — 4 tabs with Recharts (AreaChart/BarChart/LineChart/PieChart/RadialBarChart), 6 KPI cards, date range + presets, PermissionDenied gate (ADMIN/MANAGER only at FE level per design decision), all loading/empty/error states. 12 Playwright tests.
+- **Phase 14 BE result**: ReportsModule + exceljs dep — 2 endpoints: `GET /reports/summary` (JSON, ADMIN/MANAGER/RECEPTIONIST) + `GET /reports/export?format=xlsx|csv` (binary streaming, ADMIN/MANAGER only). XLSX has 3 sheets (Tổng quan/Top phòng/Theo nguồn).
+- **Phase 14 FE result**: Full /bao-cao page replacing ComingSoon — 5 KPI cards (grossRevenue/payrollExpense/operationalExpense/netProfit/occupancyPercent), summary table from `rows[]`, Top phòng vertical BarChart, byStatus donut, Top nguồn bar. Xuất XLSX button → blob download flow (ADMIN/MANAGER only), HOUSEKEEPING blocked, RECEPTIONIST view-only. 10 Playwright tests.
+- **Next**: Phase 15 — Polish + deploy.
 
 ### Phase 13 — files (BE)
 
@@ -102,7 +108,25 @@
 - `apps/web/src/types/dashboard.ts` — `DashboardTab`, `DashboardQuery`, `OverviewData`, `BookingOccupancyData`, `FinanceData`, `HousekeepingData`, `DashboardResponse` (tagged union)
 - `apps/web/src/lib/hooks/use-dashboard.ts` — `DASHBOARD_KEYS` + `useDashboard(params)` (staleTime 30s, enabled guard on from/to)
 - `apps/web/src/app/(dashboard)/tong-quan/page.tsx` — full implementation replacing ComingSoon: date range picker + 3 preset buttons (Hôm nay/7 ngày/30 ngày) + 4-tab switcher with border-b underline + OverviewTab/BookingOccupancyTab/FinanceTab/HousekeepingTab components; Recharts (AreaChart/BarChart/LineChart/PieChart/RadialBarChart); ADMIN/MANAGER permission gate; loading/empty/error states
-- `apps/web/tests/tong-quan.spec.ts` — 12 offline Playwright tests (total: 157 PASS)
+- `apps/web/tests/tong-quan.spec.ts` — 12 offline Playwright tests (total: 167 PASS)
+
+### Phase 14 — files (BE)
+
+- `apps/api/package.json` — thêm dep `exceljs ^4.4.0`
+- `apps/api/src/reports/reports.module.ts`
+- `apps/api/src/reports/reports.service.ts` — `getSummary()` aggregation (totals/topRooms/topSources/byStatusBookings/rows), `generateXlsx()` (3-sheet ExcelJS workbook), `generateCsv()` (UTF-8 BOM + label/value/note); `from >= to` → 422
+- `apps/api/src/reports/reports.controller.ts` — `GET /reports/summary` (ADMIN/MANAGER/RECEPTIONIST), `GET /reports/export?format=xlsx|csv` (ADMIN/MANAGER, sets Content-Type + Content-Disposition, `@Res({ passthrough: false })` for binary)
+- `apps/api/src/reports/dto/query-report.dto.ts` — `QueryReportDto` (from/to required) + `QueryReportExportDto` (extends + `ReportFormat` enum default xlsx)
+- `apps/api/src/reports/entities/report.entity.ts` — `ReportTotals` + `TopRoom` + `TopSource` + `ByStatusBooking` + `ReportRow` + `ReportSummaryEntity`
+- `apps/api/src/app.module.ts` — registered ReportsModule
+- `apps/api/test/reports.e2e-spec.ts` — 20 tests (506 total)
+
+### Phase 14 — files (FE)
+
+- `apps/web/src/types/report.ts` — `ReportTotals`, `TopRoom`, `TopSource`, `ByStatusBooking`, `ReportRow`, `ReportSummary`, `ReportFormat`
+- `apps/web/src/lib/hooks/use-reports.ts` — `REPORT_KEYS` + `useReportSummary(params)` query + `useExportReport()` mutation (blob download flow with anchor click + URL.createObjectURL/revokeObjectURL)
+- `apps/web/src/app/(dashboard)/bao-cao/page.tsx` — full implementation replacing ComingSoon: breadcrumb + page header (from/to dates + Áp dụng + In báo cáo + Xuất XLSX btn for ADMIN/MANAGER) + 5 KPI cards row (Tiền thu mặt/Lương đã chi/Chi vận hành/Lợi nhuận cuối/Công suất TB) + 2-panel grid (Bảng tổng hợp report 3 cols + Top phòng vertical BarChart) + bottom row (byStatus PieChart donut + Top nguồn horizontal BarChart) + RBAC (HOUSEKEEPING → PermissionDenied; RECEPTIONIST → view only; ADMIN/MANAGER → view + export) + loading skeletons + empty + error Retry states
+- `apps/web/tests/bao-cao.spec.ts` — 10 offline Playwright tests (167 total)
 
 ### Phase 12 — files (BE)
 
@@ -466,6 +490,15 @@
 - 2026-05-23: Phase 6 — Payment soft-delete: `deletedAt` on Payment. `_count.payments` and list filter both filter `deletedAt: null`. `recomputeAndSave()` recalculates from DB items (BookingItem hard-deleted on update) + live payments.
 - 2026-05-23: Phase 6 — BookingItem is hard-deleted when booking is updated with new items array (replace semantics). Payment is soft-deleted when booking is updated with new payments array.
 - 2026-05-23: Phase 6 — `BOOKING_INCLUDE_DETAIL._count.payments` uses `{ where: { deletedAt: null } }` to count only active payments. `paymentCount` in entity reflects this.
+
+- 2026-05-25: Phase 13 — Dashboard endpoint trả về `kpi` luôn có + chỉ một trong 4 tab sub-objects (overview/bookingOccupancy/finance/housekeeping) tuỳ `tab` query — payload nhỏ, FE tự switch.
+- 2026-05-25: Phase 13 — Occupancy formula nhất quán với CalendarService: `bookedNights / (activeRooms × daysInRange)`. `activeRooms` chỉ filter `deletedAt IS NULL` (không filter theo room.status.code='disabled' ở dashboard để đơn giản).
+- 2026-05-25: Phase 13 — Heatmap (occupancyHeatmap + workloadHeatmap) render bằng plain HTML grid CSS thay vì Recharts (không có heatmap built-in). Giới hạn 20 phòng × 31 ngày để payload manageable.
+- 2026-05-25: Phase 13 — Dashboard page (FE) gate `ADMIN/MANAGER` only (frontend-level), dù BE cho phép cả 4 role — design decision: dashboard analytics chỉ dành cho quản lý.
+- 2026-05-25: Phase 14 — XLSX export dùng `exceljs` (3 sheets: Tổng quan / Top phòng / Theo nguồn). NestJS controller `@Res({ passthrough: false })` + `res.send(buffer)` để stream binary bypassing global interceptor.
+- 2026-05-25: Phase 14 — CSV format alternative (`?format=csv`): UTF-8 BOM `﻿` + `label,value,note` rows, Content-Type `text/csv; charset=utf-8`.
+- 2026-05-25: Phase 14 — RBAC split: `GET /reports/summary` mở cho ADMIN/MANAGER/RECEPTIONIST (lễ tân xem báo cáo nhanh OK), `GET /reports/export` chỉ ADMIN/MANAGER (xuất file là quyền quản lý).
+- 2026-05-25: Phase 14 — FE blob download flow: `responseType: 'blob'` axios option, tạo Blob → URL.createObjectURL → anchor click → revokeObjectURL. Filename pattern `bao-cao-<from>-den-<to>.xlsx`.
 
 ## Notes for next session
 
