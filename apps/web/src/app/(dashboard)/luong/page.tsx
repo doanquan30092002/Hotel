@@ -21,7 +21,12 @@ import type { AxiosError } from 'axios';
 
 import { useAuth } from '@/lib/auth/use-auth';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
-import { usePayrolls, useDeletePayroll, useChangePayrollStatus } from '@/lib/hooks/use-payroll';
+import {
+  usePayrolls,
+  useDeletePayroll,
+  useChangePayrollStatus,
+  useExportPayroll,
+} from '@/lib/hooks/use-payroll';
 import { useCategories } from '@/lib/hooks/use-categories';
 import { formatVnd } from '@/lib/format';
 import { toast } from '@/components/ui/use-toast';
@@ -66,6 +71,19 @@ function formatMonth(month: string): string {
   const y = parts[0] ?? '';
   const m = parts[1] ?? '';
   return `Tháng ${parseInt(m, 10)}/${y}`;
+}
+
+function buildMonthOptions(count: number): { value: string; label: string }[] {
+  const now = new Date();
+  const opts: { value: string; label: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const value = `${y}-${m}`;
+    opts.push({ value, label: `Tháng ${d.getMonth() + 1}/${y}` });
+  }
+  return opts;
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -492,6 +510,12 @@ function LuongContent({ canManage }: { canManage: boolean }) {
   const [deleteTarget, setDeleteTarget] = useState<Payroll | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
 
+  // Month options for the filter dropdown (last 36 months)
+  const monthOptions = useMemo(() => buildMonthOptions(36), []);
+
+  // Export mutation
+  const exportMutation = useExportPayroll();
+
   // Payroll statuses
   const { data: statusesData } = useCategories({
     group: 'PAYROLL_STATUS',
@@ -581,16 +605,25 @@ function LuongContent({ canManage }: { canManage: boolean }) {
           {/* Month filter */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Tháng</label>
-            <Input
-              type="month"
-              className="h-9 w-44 text-sm"
-              value={monthFilter}
-              onChange={(e) => {
-                setMonthFilter(e.target.value);
+            <Select
+              value={monthFilter || '__all__'}
+              onValueChange={(v) => {
+                setMonthFilter(v === '__all__' ? '' : v);
                 setPage(1);
               }}
-              aria-label="Lọc theo tháng"
-            />
+            >
+              <SelectTrigger className="w-44 h-9 text-sm" aria-label="Lọc theo tháng">
+                <SelectValue placeholder="Tất cả tháng" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tất cả tháng</SelectItem>
+                {monthOptions.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status filter */}
@@ -621,13 +654,28 @@ function LuongContent({ canManage }: { canManage: boolean }) {
             <Button
               variant="outline"
               size="sm"
+              disabled={exportMutation.isPending}
               onClick={() =>
-                toast({ title: 'Tính năng xuất XLSX sẽ có ở Phase 14', variant: 'default' })
+                exportMutation.mutate(
+                  {
+                    statusId: statusId || undefined,
+                    month: monthFilter || undefined,
+                    keyword: dKeyword || undefined,
+                  },
+                  {
+                    onSuccess: () => {
+                      toast({ title: 'Đã tải bảng lương XLSX', variant: 'success' });
+                    },
+                    onError: () => {
+                      toast({ title: 'Xuất XLSX thất bại', variant: 'destructive' });
+                    },
+                  },
+                )
               }
               aria-label="Xuất XLSX"
             >
               <Download className="h-4 w-4 mr-1.5" aria-hidden="true" />
-              Xuất XLSX
+              {exportMutation.isPending ? 'Đang xuất...' : 'Xuất XLSX'}
             </Button>
             {canManage && (
               <>

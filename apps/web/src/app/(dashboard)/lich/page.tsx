@@ -87,9 +87,29 @@ function getStatusClasses(code: string): string {
 
 const MONTH_CELL_W = 48; // px per day cell
 const WEEK_CELL_W = 140; // px per day cell
-const ROW_H = 56; // px per room row (enough for booking bar + padding)
+const ROW_H = 72; // px per room row (enough for 2-line booking bar + padding)
 const HEADER_H = 44; // px for day header row
 const ROOM_COL_W = 180; // px for sticky room label column
+
+// ─── Booking tile helpers ─────────────────────────────────────────────────────
+
+const DEFAULT_CHECK_IN_TIME = '14:00';
+const DEFAULT_CHECK_OUT_TIME = '12:00';
+
+function formatBookingDateTime(date: string, time: string | null, fallback: string): string {
+  // "2026-05-25" + "14:00" → "25/05 14:00"
+  const parts = date.split('-');
+  const day = parts[2] ?? '';
+  const month = parts[1] ?? '';
+  return `${day}/${month} ${time ?? fallback}`;
+}
+
+function buildBookingTooltip(bk: CalendarBooking, roomName: string): string {
+  const ci = formatBookingDateTime(bk.checkIn, bk.checkInTime, DEFAULT_CHECK_IN_TIME);
+  const co = formatBookingDateTime(bk.checkOut, bk.checkOutTime, DEFAULT_CHECK_OUT_TIME);
+  const customer = bk.customer?.fullName ?? 'Khách vãng lai';
+  return `${bk.code} · ${customer}\n${roomName}\nNhận: ${ci}\nTrả: ${co}\nTrạng thái: ${bk.status.name}`;
+}
 
 interface GridViewProps {
   rooms: CalendarRoom[];
@@ -200,26 +220,40 @@ function GridView({ rooms, bookings, rangeStart, rangeEnd, cellWidth, todayIso }
                   const leftPx = startCol * cellWidth;
                   const widthPx = (endCol - startCol) * cellWidth - 2; // -2 for gap
                   const statusClasses = getStatusClasses(bk.status.code);
-                  const label =
-                    cellWidth >= 100
-                      ? `${bk.code}${bk.customer ? ` — ${bk.customer.fullName}` : ''}`
-                      : bk.code;
+
+                  const customerName = bk.customer?.fullName ?? 'Khách vãng lai';
+                  const ciTime = bk.checkInTime ?? DEFAULT_CHECK_IN_TIME;
+                  const coTime = bk.checkOutTime ?? DEFAULT_CHECK_OUT_TIME;
+                  // Compact mode for narrow tiles (~ 1 day in month view)
+                  const isCompact = widthPx < 80;
+
                   return (
                     <div
                       key={bk.id}
-                      title={`${bk.code} · ${bk.customer?.fullName ?? '—'} · ${bk.status.name}`}
-                      className={`absolute top-2 overflow-hidden rounded text-xs font-medium shadow-sm ${statusClasses}`}
+                      title={buildBookingTooltip(bk, room.name)}
+                      className={`absolute top-2 flex flex-col justify-center overflow-hidden rounded shadow-sm ${statusClasses}`}
                       style={{
                         left: leftPx + 1,
                         width: widthPx,
                         height: ROW_H - 16,
-                        display: 'flex',
-                        alignItems: 'center',
                         paddingLeft: 6,
                         paddingRight: 4,
                       }}
                     >
-                      <span className="truncate">{label}</span>
+                      {isCompact ? (
+                        <span className="truncate text-xs font-semibold leading-tight">
+                          {bk.code}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="truncate text-xs font-semibold leading-tight">
+                            {bk.code} · {customerName}
+                          </span>
+                          <span className="truncate text-[10px] leading-tight opacity-90">
+                            {room.name} · {ciTime} → {coTime}
+                          </span>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -240,7 +274,7 @@ function GridView({ rooms, bookings, rangeStart, rangeEnd, cellWidth, todayIso }
 
 // ─── Day View ─────────────────────────────────────────────────────────────────
 
-const DAY_ROW_H = 64;
+const DAY_ROW_H = 72;
 const TIME_HOURS = [0, 6, 12, 18, 24];
 
 interface DayViewProps {
@@ -343,32 +377,55 @@ function DayView({ rooms, bookings, dayDate }: DayViewProps) {
                 </div>
               ) : (
                 roomBookings.map((bk) => {
-                  // Parse check-in/check-out times, default 14:00 / 12:00
-                  const [ciH, ciM] = (bk.checkInTime ?? '14:00').split(':').map(Number);
-                  const [coH, coM] = (bk.checkOutTime ?? '12:00').split(':').map(Number);
-                  const startMin = (ciH ?? 14) * 60 + (ciM ?? 0);
-                  let endMin = (coH ?? 12) * 60 + (coM ?? 0);
-                  if (endMin <= startMin) endMin = startMin + 60; // safety
+                  // Compute this day's slice of the (possibly multi-day) booking.
+                  // Filter guarantees ci ≤ dayDate < co, so on this day the booking
+                  // always extends through midnight; only the start may be partial.
+                  const ciDate = parseDate(bk.checkIn);
+                  const ciTime = bk.checkInTime ?? DEFAULT_CHECK_IN_TIME;
+                  const isFirstDay = ciDate.getTime() === dayDate.getTime();
+
+                  let startMin = 0;
+                  if (isFirstDay) {
+                    const [ciH, ciM] = ciTime.split(':').map(Number);
+                    startMin = (ciH ?? 14) * 60 + (ciM ?? 0);
+                  }
+                  const endMin = 1440;
+
+                  const startLabel = isFirstDay ? ciTime : '00:00';
+                  const endLabel = '24:00';
+
                   const leftPct = (startMin / 1440) * 100;
                   const widthPct = Math.max(2, ((endMin - startMin) / 1440) * 100);
                   const statusClasses = getStatusClasses(bk.status.code);
+
+                  const customerName = bk.customer?.fullName ?? 'Khách vãng lai';
+                  const isCompact = widthPct < 12; // ~3h slot
+
                   return (
                     <div
                       key={bk.id}
-                      title={`${bk.code} · ${bk.customer?.fullName ?? '—'}`}
-                      className={`absolute top-2 overflow-hidden rounded px-2 text-xs font-medium shadow-sm ${statusClasses}`}
+                      title={buildBookingTooltip(bk, room.name)}
+                      className={`absolute top-2 flex flex-col justify-center overflow-hidden rounded px-2 shadow-sm ${statusClasses}`}
                       style={{
                         left: `${leftPct}%`,
                         width: `${widthPct}%`,
                         height: DAY_ROW_H - 16,
-                        display: 'flex',
-                        alignItems: 'center',
                       }}
                     >
-                      <span className="truncate">
-                        {bk.code}
-                        {bk.customer ? ` — ${bk.customer.fullName}` : ''}
-                      </span>
+                      {isCompact ? (
+                        <span className="truncate text-xs font-semibold leading-tight">
+                          {bk.code}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="truncate text-xs font-semibold leading-tight">
+                            {bk.code} · {customerName}
+                          </span>
+                          <span className="truncate text-[10px] leading-tight opacity-90">
+                            {room.name} · {startLabel} → {endLabel}
+                          </span>
+                        </>
+                      )}
                     </div>
                   );
                 })

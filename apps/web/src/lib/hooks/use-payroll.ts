@@ -121,6 +121,40 @@ export function useChangePayrollStatus() {
   });
 }
 
+// ─── useExportPayroll ─────────────────────────────────────────────────────────
+
+export function useExportPayroll() {
+  return useMutation({
+    mutationFn: async (params: Omit<PayrollListQuery, 'page' | 'pageSize'>) => {
+      const query: Record<string, string> = {};
+      if (params.staffId) query['staffId'] = params.staffId;
+      if (params.statusId) query['statusId'] = params.statusId;
+      if (params.month) query['month'] = params.month;
+      if (params.keyword) query['keyword'] = params.keyword;
+
+      const res = await api.get('/payroll/export', {
+        params: query,
+        responseType: 'blob',
+      });
+
+      const monthPart = params.month ?? 'tat-ca';
+      const filename = `bang-luong-${monthPart}.xlsx`;
+      const contentType =
+        (res.headers['content-type'] as string | undefined) ??
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const blob = new Blob([res.data as BlobPart], { type: contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+  });
+}
+
 // ─── useDeletePayroll ─────────────────────────────────────────────────────────
 
 export function useDeletePayroll() {

@@ -1666,6 +1666,453 @@ async function seedUploads(): Promise<void> {
   console.log(`Seed uploads: ${UPLOAD_SEEDS.length} rows upserted`);
 }
 
+// ── Bulk bookings (10 past + 10 present + 10 future) ────────────────────────
+
+interface BulkBookingSeed {
+  code: string;
+  customerCode: string;
+  roomCode: string;
+  sourceCode: 'walkin' | 'hotline' | 'website' | 'bookingdotcom' | 'agoda' | 'other';
+  statusCode: 'checked_out' | 'checked_in' | 'pending' | 'confirmed';
+  checkIn: string; // YYYY-MM-DD
+  checkOut: string; // YYYY-MM-DD
+  adults: number;
+  children?: number;
+}
+
+// Reference date for "present" bookings: 2026-05-25
+const PAST_BOOKINGS: BulkBookingSeed[] = [
+  {
+    code: 'BK101',
+    customerCode: 'KH001',
+    roomCode: 'P101',
+    sourceCode: 'walkin',
+    statusCode: 'checked_out',
+    checkIn: '2026-03-05',
+    checkOut: '2026-03-08',
+    adults: 2,
+  },
+  {
+    code: 'BK102',
+    customerCode: 'KH002',
+    roomCode: 'P102',
+    sourceCode: 'hotline',
+    statusCode: 'checked_out',
+    checkIn: '2026-03-12',
+    checkOut: '2026-03-14',
+    adults: 1,
+  },
+  {
+    code: 'BK103',
+    customerCode: 'KH003',
+    roomCode: 'P201',
+    sourceCode: 'bookingdotcom',
+    statusCode: 'checked_out',
+    checkIn: '2026-04-01',
+    checkOut: '2026-04-04',
+    adults: 2,
+  },
+  {
+    code: 'BK104',
+    customerCode: 'KH004',
+    roomCode: 'P202',
+    sourceCode: 'agoda',
+    statusCode: 'checked_out',
+    checkIn: '2026-04-10',
+    checkOut: '2026-04-13',
+    adults: 2,
+  },
+  {
+    code: 'BK105',
+    customerCode: 'KH005',
+    roomCode: 'P301',
+    sourceCode: 'website',
+    statusCode: 'checked_out',
+    checkIn: '2026-04-18',
+    checkOut: '2026-04-22',
+    adults: 3,
+    children: 1,
+  },
+  {
+    code: 'BK106',
+    customerCode: 'KH006',
+    roomCode: 'P302',
+    sourceCode: 'walkin',
+    statusCode: 'checked_out',
+    checkIn: '2026-04-25',
+    checkOut: '2026-04-27',
+    adults: 2,
+  },
+  {
+    code: 'BK107',
+    customerCode: 'KH007',
+    roomCode: 'B101',
+    sourceCode: 'bookingdotcom',
+    statusCode: 'checked_out',
+    checkIn: '2026-05-01',
+    checkOut: '2026-05-04',
+    adults: 4,
+  },
+  {
+    code: 'BK108',
+    customerCode: 'KH008',
+    roomCode: 'B102',
+    sourceCode: 'hotline',
+    statusCode: 'checked_out',
+    checkIn: '2026-05-05',
+    checkOut: '2026-05-07',
+    adults: 3,
+  },
+  {
+    code: 'BK109',
+    customerCode: 'KH009',
+    roomCode: 'V101',
+    sourceCode: 'agoda',
+    statusCode: 'checked_out',
+    checkIn: '2026-05-10',
+    checkOut: '2026-05-12',
+    adults: 2,
+  },
+  {
+    code: 'BK110',
+    customerCode: 'KH010',
+    roomCode: 'V102',
+    sourceCode: 'walkin',
+    statusCode: 'checked_out',
+    checkIn: '2026-05-15',
+    checkOut: '2026-05-18',
+    adults: 2,
+  },
+];
+
+const PRESENT_BOOKINGS: BulkBookingSeed[] = [
+  {
+    code: 'BK111',
+    customerCode: 'KH001',
+    roomCode: 'P101',
+    sourceCode: 'walkin',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-23',
+    checkOut: '2026-05-27',
+    adults: 2,
+  },
+  {
+    code: 'BK112',
+    customerCode: 'KH002',
+    roomCode: 'P102',
+    sourceCode: 'hotline',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-24',
+    checkOut: '2026-05-26',
+    adults: 1,
+  },
+  {
+    code: 'BK113',
+    customerCode: 'KH003',
+    roomCode: 'P201',
+    sourceCode: 'bookingdotcom',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-22',
+    checkOut: '2026-05-28',
+    adults: 2,
+  },
+  {
+    code: 'BK114',
+    customerCode: 'KH004',
+    roomCode: 'P202',
+    sourceCode: 'agoda',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-25',
+    checkOut: '2026-05-29',
+    adults: 2,
+  },
+  {
+    code: 'BK115',
+    customerCode: 'KH005',
+    roomCode: 'P301',
+    sourceCode: 'website',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-20',
+    checkOut: '2026-05-26',
+    adults: 3,
+    children: 1,
+  },
+  {
+    code: 'BK116',
+    customerCode: 'KH006',
+    roomCode: 'P302',
+    sourceCode: 'walkin',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-24',
+    checkOut: '2026-05-30',
+    adults: 2,
+  },
+  {
+    code: 'BK117',
+    customerCode: 'KH007',
+    roomCode: 'B101',
+    sourceCode: 'bookingdotcom',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-21',
+    checkOut: '2026-05-28',
+    adults: 4,
+  },
+  {
+    code: 'BK118',
+    customerCode: 'KH008',
+    roomCode: 'B102',
+    sourceCode: 'hotline',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-25',
+    checkOut: '2026-05-27',
+    adults: 2,
+  },
+  {
+    code: 'BK119',
+    customerCode: 'KH009',
+    roomCode: 'V101',
+    sourceCode: 'agoda',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-23',
+    checkOut: '2026-05-26',
+    adults: 2,
+  },
+  {
+    code: 'BK120',
+    customerCode: 'KH010',
+    roomCode: 'V102',
+    sourceCode: 'walkin',
+    statusCode: 'checked_in',
+    checkIn: '2026-05-22',
+    checkOut: '2026-05-27',
+    adults: 3,
+  },
+];
+
+const FUTURE_BOOKINGS: BulkBookingSeed[] = [
+  {
+    code: 'BK121',
+    customerCode: 'KH001',
+    roomCode: 'P101',
+    sourceCode: 'walkin',
+    statusCode: 'pending',
+    checkIn: '2026-06-10',
+    checkOut: '2026-06-12',
+    adults: 2,
+  },
+  {
+    code: 'BK122',
+    customerCode: 'KH002',
+    roomCode: 'P102',
+    sourceCode: 'hotline',
+    statusCode: 'confirmed',
+    checkIn: '2026-06-15',
+    checkOut: '2026-06-18',
+    adults: 1,
+  },
+  {
+    code: 'BK123',
+    customerCode: 'KH003',
+    roomCode: 'P201',
+    sourceCode: 'bookingdotcom',
+    statusCode: 'pending',
+    checkIn: '2026-06-20',
+    checkOut: '2026-06-23',
+    adults: 2,
+  },
+  {
+    code: 'BK124',
+    customerCode: 'KH004',
+    roomCode: 'P202',
+    sourceCode: 'agoda',
+    statusCode: 'confirmed',
+    checkIn: '2026-06-25',
+    checkOut: '2026-06-28',
+    adults: 2,
+  },
+  {
+    code: 'BK125',
+    customerCode: 'KH005',
+    roomCode: 'P301',
+    sourceCode: 'website',
+    statusCode: 'pending',
+    checkIn: '2026-07-05',
+    checkOut: '2026-07-08',
+    adults: 3,
+    children: 1,
+  },
+  {
+    code: 'BK126',
+    customerCode: 'KH006',
+    roomCode: 'P302',
+    sourceCode: 'walkin',
+    statusCode: 'confirmed',
+    checkIn: '2026-07-10',
+    checkOut: '2026-07-13',
+    adults: 2,
+  },
+  {
+    code: 'BK127',
+    customerCode: 'KH007',
+    roomCode: 'B101',
+    sourceCode: 'bookingdotcom',
+    statusCode: 'pending',
+    checkIn: '2026-07-15',
+    checkOut: '2026-07-18',
+    adults: 4,
+  },
+  {
+    code: 'BK128',
+    customerCode: 'KH008',
+    roomCode: 'B102',
+    sourceCode: 'hotline',
+    statusCode: 'confirmed',
+    checkIn: '2026-07-20',
+    checkOut: '2026-07-22',
+    adults: 2,
+  },
+  {
+    code: 'BK129',
+    customerCode: 'KH009',
+    roomCode: 'V101',
+    sourceCode: 'agoda',
+    statusCode: 'pending',
+    checkIn: '2026-08-01',
+    checkOut: '2026-08-04',
+    adults: 2,
+  },
+  {
+    code: 'BK130',
+    customerCode: 'KH010',
+    roomCode: 'V102',
+    sourceCode: 'walkin',
+    statusCode: 'confirmed',
+    checkIn: '2026-08-10',
+    checkOut: '2026-08-14',
+    adults: 3,
+  },
+];
+
+async function seedManyBookings(): Promise<void> {
+  const allSeeds = [...PAST_BOOKINGS, ...PRESENT_BOOKINGS, ...FUTURE_BOOKINGS];
+
+  const pricePerNight = await getCategoryIdByGroupCode(CategoryGroup.PRICE_TYPE, 'per_night');
+  const methodCash = await getCategoryIdByGroupCode(CategoryGroup.PAYMENT_METHOD, 'cash');
+
+  const statusCodes = ['checked_out', 'checked_in', 'pending', 'confirmed'] as const;
+  const statusMap: Record<string, string> = {};
+  for (const code of statusCodes) {
+    statusMap[code] = await getCategoryIdByGroupCode(CategoryGroup.BOOKING_STATUS, code);
+  }
+
+  const sourceCodes = ['walkin', 'hotline', 'website', 'bookingdotcom', 'agoda', 'other'] as const;
+  const sourceMap: Record<string, string> = {};
+  for (const code of sourceCodes) {
+    sourceMap[code] = await getCategoryIdByGroupCode(CategoryGroup.BOOKING_SOURCE, code);
+  }
+
+  const paidPctByStatus: Record<string, number> = {
+    checked_out: 1,
+    checked_in: 0.5,
+    confirmed: 0.3,
+    pending: 0,
+  };
+
+  for (const seed of allSeeds) {
+    const customer = await prisma.customer.findUniqueOrThrow({
+      where: { code: seed.customerCode },
+      select: { id: true },
+    });
+    const room = await prisma.room.findUniqueOrThrow({
+      where: { code: seed.roomCode },
+      select: { id: true, basePrice: true, name: true },
+    });
+
+    const ci = new Date(seed.checkIn);
+    const co = new Date(seed.checkOut);
+    const nights = Math.max(1, Math.round((co.getTime() - ci.getTime()) / 86400000));
+
+    const basePriceDec = new Prisma.Decimal(room.basePrice.toString());
+    const roomAmt = basePriceDec.mul(nights);
+    const total = roomAmt;
+    const paidPct = paidPctByStatus[seed.statusCode] ?? 0;
+    const paidNum = Math.round(Number(total.toString()) * paidPct);
+    const paid = new Prisma.Decimal(paidNum);
+    const remaining = total.sub(paid);
+
+    const sourceId = sourceMap[seed.sourceCode];
+    const statusId = statusMap[seed.statusCode];
+    if (!sourceId || !statusId) {
+      throw new Error(`Missing source/status for ${seed.code}`);
+    }
+
+    const booking = await prisma.booking.upsert({
+      where: { code: seed.code },
+      update: {
+        customerId: customer.id,
+        sourceId,
+        statusId,
+        priceTypeId: pricePerNight,
+        checkIn: ci,
+        checkOut: co,
+        adults: seed.adults,
+        children: seed.children ?? 0,
+        numRooms: 1,
+        totalAmount: total,
+        paidAmount: paid,
+        remainingAmount: remaining,
+        deletedAt: null,
+      },
+      create: {
+        code: seed.code,
+        customerId: customer.id,
+        sourceId,
+        statusId,
+        priceTypeId: pricePerNight,
+        checkIn: ci,
+        checkOut: co,
+        adults: seed.adults,
+        children: seed.children ?? 0,
+        numRooms: 1,
+        totalAmount: total,
+        paidAmount: paid,
+        remainingAmount: remaining,
+      },
+    });
+
+    await prisma.bookingItem.deleteMany({ where: { bookingId: booking.id } });
+    await prisma.bookingItem.create({
+      data: {
+        bookingId: booking.id,
+        kind: BookingItemKind.ROOM,
+        roomId: room.id,
+        refCode: seed.roomCode,
+        refName: room.name,
+        quantity: new Prisma.Decimal(nights),
+        unitPrice: basePriceDec,
+        amount: roomAmt,
+      },
+    });
+
+    await prisma.payment.deleteMany({ where: { bookingId: booking.id } });
+    if (paid.gt(0)) {
+      await prisma.payment.create({
+        data: {
+          bookingId: booking.id,
+          methodId: methodCash,
+          amount: paid,
+          paidAt: ci,
+        },
+      });
+    }
+  }
+
+  console.log(
+    `Seed bulk bookings: ${allSeeds.length} rows upserted ` +
+      `(${PAST_BOOKINGS.length} past + ${PRESENT_BOOKINGS.length} present + ${FUTURE_BOOKINGS.length} future)`,
+  );
+}
+
 async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@hotel.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
@@ -1701,6 +2148,7 @@ async function main() {
   await seedServices();
   await seedPricePackages();
   await seedBookings();
+  await seedManyBookings();
   await seedHousekeepingTasks();
   await seedFinanceTxs();
   await seedStaffs();

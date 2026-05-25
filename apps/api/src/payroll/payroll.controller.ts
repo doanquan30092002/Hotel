@@ -9,9 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 
 import { UserRole } from '@prisma/client';
 
@@ -41,6 +43,26 @@ export class PayrollController {
   @ApiResponse({ status: 200, description: 'Danh sách bảng lương' })
   async findAll(@Query() query: QueryPayrollDto) {
     return this.payrollService.list(query);
+  }
+
+  @Get('export')
+  @Roles(...PAYROLL_ROLES)
+  @ApiOperation({ summary: 'Xuất bảng lương ra XLSX (tôn trọng bộ lọc)' })
+  @ApiResponse({ status: 200, description: 'File XLSX' })
+  async exportXlsx(
+    @Query() query: QueryPayrollDto,
+    @Res({ passthrough: false }) res: Response,
+  ): Promise<void> {
+    const buffer = await this.payrollService.generateXlsx(query);
+    const monthPart = query.month ?? 'tat-ca';
+    const filename = `bang-luong-${monthPart}.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
   }
 
   @Get(':id')

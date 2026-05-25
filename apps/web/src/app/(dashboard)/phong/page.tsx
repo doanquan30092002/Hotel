@@ -392,7 +392,7 @@ function RoomFormDialog({
             cleaningStatusId: data.cleaningStatusId,
             defaultCheckIn: data.defaultCheckIn || undefined,
             defaultCheckOut: data.defaultCheckOut || undefined,
-            images: images.length > 0 ? images : undefined,
+            images,
             note: data.note || undefined,
           },
         },
@@ -420,7 +420,7 @@ function RoomFormDialog({
           cleaningStatusId: data.cleaningStatusId,
           defaultCheckIn: data.defaultCheckIn || undefined,
           defaultCheckOut: data.defaultCheckOut || undefined,
-          images: images.length > 0 ? images : undefined,
+          images,
           note: data.note || undefined,
         },
         {

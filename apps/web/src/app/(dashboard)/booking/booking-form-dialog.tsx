@@ -179,9 +179,9 @@ export function BookingFormDialog({
   const createMutation = useCreateBooking();
   const updateMutation = useUpdateBooking();
 
-  // Detail fetch for edit mode
+  // Detail fetch for edit/view mode — list endpoint omits items/payments
   const { data: detailBooking, isLoading: detailLoading } = useBooking(
-    isEditing && editTarget ? editTarget.id : '',
+    (isEditing || isViewing) && editTarget ? editTarget.id : '',
   );
 
   // Reference data

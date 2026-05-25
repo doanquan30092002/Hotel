@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { CategoryGroup, Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 
 import { paginate } from '../common/dto/paginated.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -363,6 +364,138 @@ export class PayrollService {
     });
 
     return { created, skipped };
+  }
+
+  // ── XLSX export ──────────────────────────────────────────────────────────────
+
+  async generateXlsx(query: QueryPayrollDto): Promise<Buffer> {
+    const where: Prisma.PayrollWhereInput = {
+      deletedAt: null,
+      ...(query.staffId ? { staffId: query.staffId } : {}),
+      ...(query.statusId ? { statusId: query.statusId } : {}),
+      ...(query.month ? { month: query.month } : {}),
+      ...(query.keyword
+        ? {
+            OR: [
+              { code: { contains: query.keyword, mode: 'insensitive' } },
+              { staff: { fullName: { contains: query.keyword, mode: 'insensitive' } } },
+              { staff: { code: { contains: query.keyword, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const rows = await this.prisma.payroll.findMany({
+      where,
+      orderBy: [{ month: 'desc' }, { code: 'asc' }],
+      include: PAYROLL_INCLUDE,
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Hotel Management';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Bảng lương');
+    sheet.columns = [
+      { header: 'Mã', key: 'code', width: 12 },
+      { header: 'Tháng', key: 'month', width: 12 },
+      { header: 'Mã NS', key: 'staffCode', width: 14 },
+      { header: 'Nhân sự', key: 'staffName', width: 26 },
+      { header: 'Chức vụ', key: 'position', width: 20 },
+      { header: 'Ngày công', key: 'workingDays', width: 12 },
+      { header: 'Lương cơ bản', key: 'baseSalary', width: 16 },
+      { header: 'Phụ cấp', key: 'allowance', width: 14 },
+      { header: 'Thưởng', key: 'bonus', width: 14 },
+      { header: 'Phạt', key: 'penalty', width: 14 },
+      { header: 'Thực nhận', key: 'netSalary', width: 16 },
+      { header: 'Trạng thái', key: 'status', width: 16 },
+      { header: 'Ngày trả', key: 'paidAt', width: 18 },
+      { header: 'Ghi chú', key: 'note', width: 30 },
+    ];
+
+    const moneyCols = ['baseSalary', 'allowance', 'bonus', 'penalty', 'netSalary'];
+
+    let totalBase = new Prisma.Decimal(0);
+    let totalAllowance = new Prisma.Decimal(0);
+    let totalBonus = new Prisma.Decimal(0);
+    let totalPenalty = new Prisma.Decimal(0);
+    let totalNet = new Prisma.Decimal(0);
+
+    for (const p of rows) {
+      const baseSalary = new Prisma.Decimal(p.baseSalary.toString());
+      const allowance = new Prisma.Decimal(p.allowance.toString());
+      const bonus = new Prisma.Decimal(p.bonus.toString());
+      const penalty = new Prisma.Decimal(p.penalty.toString());
+      const netSalary = new Prisma.Decimal(p.netSalary.toString());
+
+      totalBase = totalBase.add(baseSalary);
+      totalAllowance = totalAllowance.add(allowance);
+      totalBonus = totalBonus.add(bonus);
+      totalPenalty = totalPenalty.add(penalty);
+      totalNet = totalNet.add(netSalary);
+
+      sheet.addRow({
+        code: p.code,
+        month: p.month,
+        staffCode: p.staff.code,
+        staffName: p.staff.fullName,
+        position: p.staff.position?.name ?? '',
+        workingDays: p.workingDays,
+        baseSalary: Number(baseSalary),
+        allowance: Number(allowance),
+        bonus: Number(bonus),
+        penalty: Number(penalty),
+        netSalary: Number(netSalary),
+        status: p.status.name,
+        paidAt: p.paidAt ? p.paidAt.toISOString().slice(0, 10) : '',
+        note: p.note ?? '',
+      });
+    }
+
+    // Totals row
+    const totalsRow = sheet.addRow({
+      code: 'TỔNG',
+      month: '',
+      staffCode: '',
+      staffName: '',
+      position: '',
+      workingDays: '',
+      baseSalary: Number(totalBase),
+      allowance: Number(totalAllowance),
+      bonus: Number(totalBonus),
+      penalty: Number(totalPenalty),
+      netSalary: Number(totalNet),
+      status: '',
+      paidAt: '',
+      note: '',
+    });
+    totalsRow.font = { bold: true };
+    totalsRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF1F5F9' },
+    };
+
+    // Apply VND format to money columns
+    for (const colKey of moneyCols) {
+      const col = sheet.getColumn(colKey);
+      col.numFmt = '#,##0';
+    }
+
+    // Style header row
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' },
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   /**
