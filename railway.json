@@ -1,0 +1,14 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter @hotel/api exec prisma generate && pnpm --filter @hotel/api build"
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @hotel/api exec prisma migrate deploy && pnpm --filter @hotel/api start:prod",
+    "healthcheckPath": "/api/v1/health",
+    "healthcheckTimeout": 100,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}

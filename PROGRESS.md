@@ -3,7 +3,7 @@
 > Cập nhật file này TRƯỚC khi kết thúc 1 task. Dùng skill `update-progress` để giúp tự động.
 
 **Last updated**: 2026-05-25
-**Current phase**: Phase 13 + 14 HOÀN TẤT — 506/506 e2e (41 mới: 21 dashboard + 20 reports) + 167/167 Playwright (22 mới: 12 tong-quan + 10 bao-cao), lint 0w, typecheck 0e cả 2 workspace
+**Current phase**: Phase 15 — Polish DONE + Deploy infra config DONE (chờ user link GitHub vào Vercel/Railway dashboard)
 **Active branch**: `master`
 
 ## Phase status
@@ -78,20 +78,30 @@
 - [x] **12. Uploads (Tệp upload)** (BE complete — 464 e2e total, lint 0w, typecheck 0e; FE complete — 145/145 Playwright, lint 0w, typecheck 0e)
 - [x] **13. Dashboard** (BE complete — 21 e2e new, lint 0w, typecheck 0e; FE complete — 12 Playwright new, lint 0w, typecheck 0e)
 - [x] **14. Báo cáo & xuất file** (BE complete — 506 e2e total (20 mới: reports), lint 0w, typecheck 0e; FE complete — 10 Playwright new, 167 total, lint 0w, typecheck 0e)
-- [ ] 15. Polish + deploy
+- [~] **15. Polish + deploy**
+  - [x] Polish: payroll XLSX export (BE+FE) — mirror reports flow
+  - [x] Polish: `/lich` calendar tile 2-line (code+customer / room+ci→co time) + rich tooltip + taller row
+  - [x] Polish: booking view mode fetch detail (items/payments)
+  - [x] Polish: `/phong` images empty array fix
+  - [x] Smoke test seed: 30 bookings (10 past + 10 present + 10 future)
+  - [x] BE: `main.ts` PORT fallback for Railway compatibility (`PORT > API_PORT > 3001`)
+  - [x] Deploy config: `apps/web/vercel.json`, `railway.json`, `apps/web/.env.example`, `apps/api/.env.example`
+  - [x] `DEPLOY.md` — step-by-step Vercel + Railway setup + smoke test checklist
+  - [ ] User action: link GitHub repo trong Vercel + Railway dashboard (1 lần), set env vars theo `DEPLOY.md`
+  - [ ] Smoke test full luồng trên preview URL sau khi deploy
 
 ## Currently working on
 
-- **Status**: Phase 13 (Dashboard) + Phase 14 (Reports) HOÀN TẤT.
-  - BE: 506/506 e2e PASS (19 suites; 41 mới = 21 dashboard + 20 reports), lint 0w, typecheck 0e
-  - FE: 167/167 Playwright PASS (22 mới = 12 tong-quan + 10 bao-cao), lint 0w, typecheck 0e
-  - Pre-existing flake: `lich.spec.ts` "unauthenticated redirect" timing — passes in isolation (10s), not Phase 13/14 related
+- **Status**: Phase 15 — Polish DONE + Deploy infra DONE (chờ user link GitHub vào Vercel/Railway dashboard).
+  - Polish commit: `049f222 feat(polish): Phase 15 - polish + smoke test seed + payroll XLSX export`
+  - Polish gồm: payroll XLSX export, calendar 2-line tile + tooltip, booking view-mode detail fetch, /phong images fix, 30 bookings smoke-test seed
+  - Deploy config: `apps/web/vercel.json` + `railway.json` (monorepo root) + per-app `.env.example` + `DEPLOY.md` step-by-step
+  - BE: `main.ts` PORT fallback (`PORT > API_PORT > 3001`) cho Railway
 - **Branch policy**: Làm trực tiếp trên `master`.
-- **Phase 13 BE result**: DashboardModule with single `GET /dashboard?from&to&tab` endpoint covering 4 tabs (overview/booking_occupancy/finance/housekeeping) + always-present KPI block. No DB schema change — pure aggregation over Booking/BookingItem/Payment/Room/FinanceTx/HousekeepingTask/Category. RBAC: all 4 roles.
-- **Phase 13 FE result**: Full /tong-quan page replacing ComingSoon — 4 tabs with Recharts (AreaChart/BarChart/LineChart/PieChart/RadialBarChart), 6 KPI cards, date range + presets, PermissionDenied gate (ADMIN/MANAGER only at FE level per design decision), all loading/empty/error states. 12 Playwright tests.
-- **Phase 14 BE result**: ReportsModule + exceljs dep — 2 endpoints: `GET /reports/summary` (JSON, ADMIN/MANAGER/RECEPTIONIST) + `GET /reports/export?format=xlsx|csv` (binary streaming, ADMIN/MANAGER only). XLSX has 3 sheets (Tổng quan/Top phòng/Theo nguồn).
-- **Phase 14 FE result**: Full /bao-cao page replacing ComingSoon — 5 KPI cards (grossRevenue/payrollExpense/operationalExpense/netProfit/occupancyPercent), summary table from `rows[]`, Top phòng vertical BarChart, byStatus donut, Top nguồn bar. Xuất XLSX button → blob download flow (ADMIN/MANAGER only), HOUSEKEEPING blocked, RECEPTIONIST view-only. 10 Playwright tests.
-- **Next**: Phase 15 — Polish + deploy.
+- **Phase 15 — User action còn lại**:
+  1. Vercel: Add Project → import repo → Root Directory `apps/web` → set `NEXT_PUBLIC_API_BASE_URL` (xem `DEPLOY.md` mục 2)
+  2. Railway: New Project → import repo + add Postgres → set env vars (JWT secrets, CORS_ORIGIN, …) → seed admin (mục 1)
+  3. Smoke test full luồng (mục 3 trong `DEPLOY.md`)
 
 ### Phase 13 — files (BE)
 

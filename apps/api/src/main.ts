@@ -13,7 +13,8 @@ async function bootstrap() {
 
   const apiPrefix = process.env.API_PREFIX ?? '/api/v1';
   const corsOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
-  const port = Number(process.env.API_PORT ?? 3001);
+  // Railway injects PORT dynamically; fall back to API_PORT for local dev.
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
 
   app.use(helmet());
   app.enableCors({ origin: corsOrigin.split(','), credentials: true });
